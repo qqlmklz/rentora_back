@@ -54,5 +54,36 @@ func (db *DB) migrate(ctx context.Context) error {
 		return err
 	}
 	_, err = db.Pool.Exec(ctx, `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS favorites (
+			id          SERIAL PRIMARY KEY,
+			user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			property_id INT NOT NULL,
+			created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+			UNIQUE (user_id, property_id)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS properties (
+			id            SERIAL PRIMARY KEY,
+			title         TEXT NOT NULL,
+			category      TEXT NOT NULL,
+			price         INT NOT NULL,
+			property_type TEXT NOT NULL,
+			rooms         INT NOT NULL,
+			area          DOUBLE PRECISION NOT NULL,
+			city          TEXT NOT NULL,
+			district      TEXT NOT NULL,
+			image         TEXT,
+			created_at    TIMESTAMP NOT NULL DEFAULT NOW()
+		)
+	`)
 	return err
 }

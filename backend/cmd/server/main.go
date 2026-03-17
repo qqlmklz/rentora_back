@@ -34,11 +34,13 @@ func main() {
 
 	authService := services.NewAuthService(db, cfg.JWTSecret)
 	profileService := services.NewProfileService(db)
+	propertyService := services.NewPropertyService(db)
+	favoritesService := services.NewFavoritesService(db)
 
 	gin.SetMode(cfg.GinMode)
 	r := gin.New()
 
-	routes.Setup(r, cfg.CORSOrigins, authService, profileService, cfg.JWTSecret)
+	routes.Setup(r, cfg.CORSOrigins, authService, profileService, propertyService, favoritesService, cfg.JWTSecret)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("Rentora backend starting on %s", addr)

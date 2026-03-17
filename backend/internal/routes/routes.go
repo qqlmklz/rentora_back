@@ -9,7 +9,7 @@ import (
 )
 
 // Setup configures all routes and middleware on the given engine.
-func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthService, profileService *services.ProfileService, jwtSecret string) {
+func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthService, profileService *services.ProfileService, propertyService *services.PropertyService, favoritesService *services.FavoritesService, jwtSecret string) {
 	r.Use(middleware.RecoveryJSON())
 	r.Use(middleware.Logging())
 	r.Use(middleware.CORS(corsOrigins))
@@ -30,13 +30,13 @@ func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthServic
 		userRoutes(users)
 
 		properties := api.Group("/properties")
-		propertyRoutes(properties)
+		propertyRoutes(properties, propertyService)
 
 		applications := api.Group("/applications")
 		applicationRoutes(applications)
 
 		favorites := api.Group("/favorites")
-		favoriteRoutes(favorites)
+		favoriteRoutes(favorites, favoritesService, jwtSecret)
 	}
 }
 
@@ -59,14 +59,18 @@ func userRoutes(g *gin.RouterGroup) {
 	// GET/PUT /api/users/:id, etc.
 }
 
-func propertyRoutes(g *gin.RouterGroup) {
-	// GET/POST /api/properties, GET /api/properties/:id, etc.
+func propertyRoutes(g *gin.RouterGroup, propertyService *services.PropertyService) {
+	// Catalog: list properties with filters.
+	g.GET("", handlers.GetProperties(propertyService))
 }
 
 func applicationRoutes(g *gin.RouterGroup) {
 	// GET/POST /api/applications, etc.
 }
 
-func favoriteRoutes(g *gin.RouterGroup) {
-	// GET/POST/DELETE /api/favorites, etc.
+func favoriteRoutes(g *gin.RouterGroup, favService *services.FavoritesService, jwtSecret string) {
+	g.Use(middleware.Auth(jwtSecret))
+	g.GET("", handlers.GetFavorites(favService))
+	g.POST("/:propertyId", handlers.AddFavorite(favService))
+	g.DELETE("/:propertyId", handlers.RemoveFavorite(favService))
 }

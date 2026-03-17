@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"rentora/backend/internal/middleware"
@@ -31,8 +32,15 @@ var allowedAvatarTypes = map[string]bool{
 func profileResponse(u *models.User) models.UserResponse {
 	r := u.ToResponse()
 	if u.Avatar != nil && *u.Avatar != "" {
-		url := avatarURLPrefix + *u.Avatar
-		r.Avatar = &url
+		// Backward compatible:
+		// - new format stored in DB: "/uploads/avatars/filename.jpg"
+		// - old format stored in DB: "avatars/filename.jpg"
+		if strings.HasPrefix(*u.Avatar, "/") {
+			r.Avatar = u.Avatar
+		} else {
+			url := avatarURLPrefix + *u.Avatar
+			r.Avatar = &url
+		}
 	}
 	return r
 }
@@ -149,7 +157,7 @@ func UpdateAvatar(profileService *services.ProfileService) gin.HandlerFunc {
 		}
 		baseName := fmt.Sprintf("%d_%d%s", userID, time.Now().UnixNano(), ext)
 		avatarPath := filepath.Join(avatarUploadDir, baseName)
-		relativePath := filepath.ToSlash(filepath.Join("avatars", baseName))
+		publicPath := "/uploads/avatars/" + baseName
 		if err := os.MkdirAll(avatarUploadDir, 0755); err != nil {
 			log.Printf("[profile] mkdir: %v", err)
 			utils.JSONErrorInternal(c, "Ошибка сохранения файла")
@@ -160,7 +168,7 @@ func UpdateAvatar(profileService *services.ProfileService) gin.HandlerFunc {
 			utils.JSONErrorInternal(c, "Ошибка сохранения файла")
 			return
 		}
-		if err := profileService.UpdateAvatar(c.Request.Context(), userID, relativePath); err != nil {
+		if err := profileService.UpdateAvatar(c.Request.Context(), userID, publicPath); err != nil {
 			log.Printf("[profile] avatar update: %v", err)
 			utils.JSONErrorInternal(c, "Ошибка обновления аватарки")
 			return
