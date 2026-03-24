@@ -12,9 +12,6 @@ import (
 // ErrFavoriteExists is returned when favorite already exists for user/property.
 var ErrFavoriteExists = errors.New("favorite already exists")
 
-// ErrPropertyNotFound is returned when property does not exist.
-var ErrPropertyNotFound = errors.New("property not found")
-
 // AddFavorite adds property to user's favorites.
 func (db *DB) AddFavorite(ctx context.Context, userID, propertyID int) error {
 	// Ensure property exists.
@@ -60,7 +57,21 @@ func (db *DB) RemoveFavorite(ctx context.Context, userID, propertyID int) error 
 // ListFavorites returns properties favorited by the given user.
 func (db *DB) ListFavorites(ctx context.Context, userID int) ([]models.Property, error) {
 	rows, err := db.Pool.Query(ctx, `
-		SELECT p.id, p.title, p.category, p.price, p.property_type, p.rooms, p.area, p.city, p.district, p.image
+		SELECT
+			p.id,
+			p.title,
+			p.price,
+			p.property_type,
+			p.rooms,
+			p.total_area,
+			p.city,
+			p.district,
+			COALESCE(
+				(SELECT array_agg(pi.image_url ORDER BY pi.id)
+				 FROM property_images pi
+				 WHERE pi.property_id = p.id),
+				'{}'
+			) AS photos
 		FROM favorites f
 		JOIN properties p ON p.id = f.property_id
 		WHERE f.user_id = $1
@@ -71,12 +82,27 @@ func (db *DB) ListFavorites(ctx context.Context, userID int) ([]models.Property,
 	}
 	defer rows.Close()
 
-	var result []models.Property
+	result := []models.Property{} // Возвращаем [] вместо null
 	for rows.Next() {
 		var p models.Property
-		if err := rows.Scan(&p.ID, &p.Title, &p.Category, &p.Price, &p.PropertyType, &p.Rooms, &p.Area, &p.City, &p.District, &p.Image); err != nil {
+		var photos []string
+		if err := rows.Scan(
+			&p.ID,
+			&p.Title,
+			&p.Price,
+			&p.PropertyType,
+			&p.Rooms,
+			&p.TotalArea,
+			&p.City,
+			&p.District,
+			&photos,
+		); err != nil {
 			return nil, err
 		}
+		if photos == nil {
+			photos = []string{}
+		}
+		p.Photos = photos
 		result = append(result, p)
 	}
 	if rows.Err() != nil {
@@ -84,4 +110,3 @@ func (db *DB) ListFavorites(ctx context.Context, userID int) ([]models.Property,
 	}
 	return result, nil
 }
-

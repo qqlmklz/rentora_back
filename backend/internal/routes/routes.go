@@ -30,7 +30,7 @@ func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthServic
 		userRoutes(users)
 
 		properties := api.Group("/properties")
-		propertyRoutes(properties, propertyService)
+		propertyRoutes(properties, propertyService, jwtSecret)
 
 		applications := api.Group("/applications")
 		applicationRoutes(applications)
@@ -59,9 +59,13 @@ func userRoutes(g *gin.RouterGroup) {
 	// GET/PUT /api/users/:id, etc.
 }
 
-func propertyRoutes(g *gin.RouterGroup, propertyService *services.PropertyService) {
+func propertyRoutes(g *gin.RouterGroup, propertyService *services.PropertyService, jwtSecret string) {
 	// Catalog: list properties with filters.
 	g.GET("", handlers.GetProperties(propertyService))
+	// Single property (public).
+	g.GET("/:id", handlers.GetPropertyByID(propertyService))
+	// Create property: authorized only.
+	g.POST("", middleware.Auth(jwtSecret), handlers.CreateProperty(propertyService))
 }
 
 func applicationRoutes(g *gin.RouterGroup) {

@@ -5,12 +5,11 @@ package models
 type Property struct {
 	ID           int      `json:"id"`
 	Title        string   `json:"title"`
-	Category     string   `json:"category,omitempty"`
 	Price        int      `json:"price"`
-	PropertyType string   `json:"property_type"`
+	PropertyType string   `json:"propertyType"`
 	Rooms        int      `json:"rooms"`
-	Area         float64  `json:"area"`
+	TotalArea    float64  `json:"totalArea"`
 	City         string   `json:"city"`
 	District     string   `json:"district"`
-	Image        *string  `json:"image,omitempty"`
+	Photos       []string `json:"photos"`
 }

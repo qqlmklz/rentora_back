@@ -1,0 +1,29 @@
+package models
+
+// PropertyDetail is the public response for GET /api/properties/:id (no apartmentNumber).
+type PropertyDetail struct {
+	ID                  int      `json:"id"`
+	Title               string   `json:"title"`
+	Price               int      `json:"price"`
+	PropertyType        string   `json:"propertyType"`
+	Rooms               int      `json:"rooms"`
+	TotalArea           float64  `json:"totalArea"`
+	LivingArea          *float64 `json:"livingArea,omitempty"`
+	KitchenArea         *float64 `json:"kitchenArea,omitempty"`
+	Floor               *int     `json:"floor,omitempty"`
+	TotalFloors         *int     `json:"totalFloors,omitempty"`
+	HousingType         *string  `json:"housingType,omitempty"`
+	RentType            string   `json:"rentType"`
+	Address             string   `json:"address"`
+	City                string   `json:"city"`
+	District            string   `json:"district"`
+	Metro               *string  `json:"metro,omitempty"`
+	UtilitiesIncluded   bool     `json:"utilitiesIncluded"`
+	UtilitiesPrice      *int     `json:"utilitiesPrice,omitempty"`
+	Deposit             *int     `json:"deposit,omitempty"`
+	CommissionPercent   *int     `json:"commissionPercent,omitempty"`
+	Prepayment          *string  `json:"prepayment,omitempty"`
+	ChildrenAllowed     bool     `json:"childrenAllowed"`
+	PetsAllowed         bool     `json:"petsAllowed"`
+	Photos              []string `json:"photos"`
+}
