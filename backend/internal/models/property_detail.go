@@ -26,4 +26,7 @@ type PropertyDetail struct {
 	ChildrenAllowed     bool     `json:"childrenAllowed"`
 	PetsAllowed         bool     `json:"petsAllowed"`
 	Photos              []string `json:"photos"`
+	OwnerID             *int     `json:"ownerId,omitempty"`
+	OwnerName           *string  `json:"ownerName,omitempty"`
+	OwnerAvatar         *string  `json:"ownerAvatar,omitempty"`
 }

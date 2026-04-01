@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const avatarURLPrefix = "/uploads/"
+
 // ErrPropertyNotFound is returned when a property does not exist.
 var ErrPropertyNotFound = errors.New("property not found")
 // PropertyFilters describes catalog filters.
@@ -147,6 +149,9 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 			p.prepayment,
 			p.children_allowed,
 			p.pets_allowed,
+			u.id,
+			u.name,
+			u.avatar,
 			COALESCE(
 				(SELECT array_agg(pi.image_url ORDER BY pi.id)
 				 FROM property_images pi
@@ -154,6 +159,7 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 				'{}'
 			) AS photos
 		FROM properties p
+		LEFT JOIN users u ON u.id = p.user_id
 		WHERE p.id = $1
 	`, id)
 
@@ -162,6 +168,8 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 	var fl, tf sql.NullInt64
 	var ht, metro, prep sql.NullString
 	var up, dep, comm sql.NullInt64
+	var ownerID sql.NullInt64
+	var ownerName, ownerAvatar sql.NullString
 	var photos []string
 
 	err := row.Scan(
@@ -188,6 +196,9 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 		&prep,
 		&d.ChildrenAllowed,
 		&d.PetsAllowed,
+		&ownerID,
+		&ownerName,
+		&ownerAvatar,
 		&photos,
 	)
 	if err != nil {
@@ -236,6 +247,21 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 	if prep.Valid {
 		s := prep.String
 		d.Prepayment = &s
+	}
+	if ownerID.Valid {
+		oid := int(ownerID.Int64)
+		d.OwnerID = &oid
+	}
+	if ownerName.Valid {
+		s := ownerName.String
+		d.OwnerName = &s
+	}
+	if ownerAvatar.Valid && ownerAvatar.String != "" {
+		s := ownerAvatar.String
+		if !strings.HasPrefix(s, "/") {
+			s = avatarURLPrefix + strings.TrimPrefix(s, "/")
+		}
+		d.OwnerAvatar = &s
 	}
 	if photos == nil {
 		photos = []string{}

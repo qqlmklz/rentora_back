@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -45,10 +46,10 @@ func AddFavorite(favService *services.FavoritesService) gin.HandlerFunc {
 		}
 		err = favService.Add(c.Request.Context(), userID, propertyID)
 		if err != nil {
-			switch err {
-			case services.ErrPropertyNotFound:
+			switch {
+			case errors.Is(err, services.ErrPropertyNotFound):
 				utils.JSONErrorNotFound(c, "Объявление не найдено")
-			case services.ErrFavoriteExists:
+			case errors.Is(err, services.ErrFavoriteExists):
 				utils.JSONErrorConflict(c, "Объявление уже в избранном")
 			default:
 				log.Printf("[favorites] add: %v", err)
@@ -75,7 +76,7 @@ func RemoveFavorite(favService *services.FavoritesService) gin.HandlerFunc {
 		}
 		err = favService.Remove(c.Request.Context(), userID, propertyID)
 		if err != nil {
-			if err == services.ErrPropertyNotFound {
+			if errors.Is(err, services.ErrPropertyNotFound) {
 				utils.JSONErrorNotFound(c, "Объявление не найдено")
 				return
 			}
