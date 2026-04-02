@@ -19,8 +19,9 @@ func NewFavoritesService(repo *repository.DB) *FavoritesService {
 
 // Aliases to repository errors for handlers.
 var (
-	ErrFavoriteExists   = repository.ErrFavoriteExists
-	ErrPropertyNotFound = repository.ErrPropertyNotFound
+	ErrFavoriteExists    = repository.ErrFavoriteExists
+	ErrPropertyNotFound  = repository.ErrPropertyNotFound
+	ErrPropertyForbidden = repository.ErrPropertyForbidden
 )
 
 // List returns user's favorite properties.

@@ -24,7 +24,7 @@ func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthServic
 		authRoutes(auth, authService, jwtSecret)
 
 		profile := api.Group("/profile")
-		profileRoutes(profile, profileService, jwtSecret)
+		profileRoutes(profile, profileService, propertyService, jwtSecret)
 
 		users := api.Group("/users")
 		userRoutes(users)
@@ -46,13 +46,14 @@ func authRoutes(g *gin.RouterGroup, authService *services.AuthService, jwtSecret
 	g.GET("/me", middleware.Auth(jwtSecret), handlers.Me(authService))
 }
 
-func profileRoutes(g *gin.RouterGroup, profileService *services.ProfileService, jwtSecret string) {
+func profileRoutes(g *gin.RouterGroup, profileService *services.ProfileService, propertyService *services.PropertyService, jwtSecret string) {
 	g.Use(middleware.Auth(jwtSecret))
 	g.GET("", handlers.GetProfile(profileService))
 	g.PATCH("", handlers.UpdateProfile(profileService))
 	g.PATCH("/avatar", handlers.UpdateAvatar(profileService))
 	g.DELETE("/avatar", handlers.DeleteAvatar(profileService))
 	g.PATCH("/password", handlers.UpdatePassword(profileService))
+	g.GET("/properties", handlers.GetMyProperties(propertyService))
 }
 
 func userRoutes(g *gin.RouterGroup) {
@@ -62,10 +63,13 @@ func userRoutes(g *gin.RouterGroup) {
 func propertyRoutes(g *gin.RouterGroup, propertyService *services.PropertyService, jwtSecret string) {
 	// Catalog: list properties with filters.
 	g.GET("", handlers.GetProperties(propertyService))
-	// Single property (public).
-	g.GET("/:id", handlers.GetPropertyByID(propertyService))
 	// Create property: authorized only.
 	g.POST("", middleware.Auth(jwtSecret), handlers.CreateProperty(propertyService))
+	// Single property (public; optional JWT for owner-only fields).
+	g.GET("/:id", handlers.GetPropertyByID(propertyService, jwtSecret))
+	// Owner-only (JWT).
+	g.DELETE("/:id", middleware.Auth(jwtSecret), handlers.DeleteProperty(propertyService))
+	g.PATCH("/:id", middleware.Auth(jwtSecret), handlers.UpdateProperty(propertyService))
 }
 
 func applicationRoutes(g *gin.RouterGroup) {

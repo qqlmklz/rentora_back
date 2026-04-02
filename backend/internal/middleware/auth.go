@@ -43,3 +43,21 @@ func GetUserID(c *gin.Context) (int, bool) {
 	uid, ok := id.(int)
 	return uid, ok
 }
+
+// ParseUserIDFromBearer parses Authorization: Bearer <jwt> without failing the request.
+// Returns (0, false) if missing or invalid.
+func ParseUserIDFromBearer(c *gin.Context, jwtSecret string) (int, bool) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return 0, false
+	}
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return 0, false
+	}
+	userID, err := utils.ParseToken(parts[1], jwtSecret)
+	if err != nil {
+		return 0, false
+	}
+	return userID, true
+}

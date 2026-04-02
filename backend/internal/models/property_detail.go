@@ -1,10 +1,12 @@
 package models
 
-// PropertyDetail is the public response for GET /api/properties/:id (no apartmentNumber).
+// PropertyDetail is the response for GET /api/properties/:id.
+// apartmentNumber is only included for the owner (when JWT matches owner).
 type PropertyDetail struct {
 	ID                  int      `json:"id"`
 	Title               string   `json:"title"`
 	Price               int      `json:"price"`
+	Category            string   `json:"category"`
 	PropertyType        string   `json:"propertyType"`
 	Rooms               int      `json:"rooms"`
 	TotalArea           float64  `json:"totalArea"`
@@ -17,6 +19,7 @@ type PropertyDetail struct {
 	Address             string   `json:"address"`
 	City                string   `json:"city"`
 	District            string   `json:"district"`
+	ApartmentNumber     *string  `json:"apartmentNumber,omitempty"`
 	Metro               *string  `json:"metro,omitempty"`
 	UtilitiesIncluded   bool     `json:"utilitiesIncluded"`
 	UtilitiesPrice      *int     `json:"utilitiesPrice,omitempty"`

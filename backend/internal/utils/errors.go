@@ -27,6 +27,11 @@ func JSONErrorNotFound(c *gin.Context, message string) {
 	JSONError(c, http.StatusNotFound, "Not Found", message)
 }
 
+// JSONErrorForbidden sends 403 with message.
+func JSONErrorForbidden(c *gin.Context, message string) {
+	JSONError(c, http.StatusForbidden, "Forbidden", message)
+}
+
 // JSONErrorUnauthorized sends 401 with message.
 func JSONErrorUnauthorized(c *gin.Context, message string) {
 	JSONError(c, http.StatusUnauthorized, "Unauthorized", message)

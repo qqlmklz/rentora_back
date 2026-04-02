@@ -16,6 +16,9 @@ const avatarURLPrefix = "/uploads/"
 
 // ErrPropertyNotFound is returned when a property does not exist.
 var ErrPropertyNotFound = errors.New("property not found")
+
+// ErrPropertyForbidden is returned when the user is not the owner of the property.
+var ErrPropertyForbidden = errors.New("property forbidden")
 // PropertyFilters describes catalog filters.
 type PropertyFilters struct {
 	Category     string
@@ -122,7 +125,7 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 	return props, nil
 }
 
-// GetPropertyByID returns one property for the public detail page (no apartment_number).
+// GetPropertyByID returns one property for the detail page (category always; apartmentNumber set in DB, handler may strip for non-owners).
 func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDetail, error) {
 	row := db.Pool.QueryRow(ctx, `
 		SELECT
@@ -130,6 +133,7 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 			p.title,
 			p.price,
 			p.property_type,
+			p.category,
 			p.rooms,
 			p.total_area,
 			p.living_area,
@@ -141,6 +145,7 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 			p.address,
 			p.city,
 			p.district,
+			p.apartment_number,
 			p.metro,
 			p.utilities_included,
 			p.utilities_price,
@@ -167,6 +172,7 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 	var la, ka sql.NullFloat64
 	var fl, tf sql.NullInt64
 	var ht, metro, prep sql.NullString
+	var apt sql.NullString
 	var up, dep, comm sql.NullInt64
 	var ownerID sql.NullInt64
 	var ownerName, ownerAvatar sql.NullString
@@ -177,6 +183,7 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 		&d.Title,
 		&d.Price,
 		&d.PropertyType,
+		&d.Category,
 		&d.Rooms,
 		&d.TotalArea,
 		&la,
@@ -188,6 +195,7 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 		&d.Address,
 		&d.City,
 		&d.District,
+		&apt,
 		&metro,
 		&d.UtilitiesIncluded,
 		&up,
@@ -227,6 +235,10 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 	if ht.Valid {
 		s := ht.String
 		d.HousingType = &s
+	}
+	if apt.Valid {
+		s := apt.String
+		d.ApartmentNumber = &s
 	}
 	if metro.Valid {
 		s := metro.String

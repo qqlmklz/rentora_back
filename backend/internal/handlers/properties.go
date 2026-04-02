@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,9 +22,10 @@ import (
 )
 
 const (
-	propertyPhotosKey   = "photos"
-	minPropertyPhotos   = 5
-	propertyUploadDir   = "uploads/properties"
+	propertyPhotosKey       = "photos"
+	existingPhotosFormKey   = "existingPhotos"
+	minPropertyPhotos       = 5
+	propertyUploadDir       = "uploads/properties"
 )
 
 // GetProperties handles GET /api/properties for catalog.
@@ -61,8 +64,8 @@ func GetProperties(propertyService *services.PropertyService) gin.HandlerFunc {
 	}
 }
 
-// GetPropertyByID handles GET /api/properties/:id (public, no auth).
-func GetPropertyByID(propertyService *services.PropertyService) gin.HandlerFunc {
+// GetPropertyByID handles GET /api/properties/:id (public). Optional Bearer JWT: owner sees apartmentNumber.
+func GetPropertyByID(propertyService *services.PropertyService, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")
 		id, err := strconv.Atoi(idStr)
@@ -79,6 +82,10 @@ func GetPropertyByID(propertyService *services.PropertyService) gin.HandlerFunc 
 			log.Printf("[properties] GetByID: %v", err)
 			utils.JSONErrorInternal(c, "Ошибка загрузки объявления")
 			return
+		}
+		uid, ok := middleware.ParseUserIDFromBearer(c, jwtSecret)
+		if !ok || detail.OwnerID == nil || *detail.OwnerID != uid {
+			detail.ApartmentNumber = nil
 		}
 		c.JSON(http.StatusOK, detail)
 	}
@@ -148,6 +155,153 @@ func CreateProperty(propertyService *services.PropertyService) gin.HandlerFunc {
 			District: in.District,
 			Images:   urls,
 		})
+	}
+}
+
+// GetMyProperties handles GET /api/profile/properties (JWT).
+func GetMyProperties(propertyService *services.PropertyService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := middleware.GetUserID(c)
+		if !ok {
+			utils.JSONErrorUnauthorized(c, "Требуется авторизация")
+			return
+		}
+		props, err := propertyService.ListMine(c.Request.Context(), userID)
+		if err != nil {
+			log.Printf("[properties] ListMine: %v", err)
+			utils.JSONErrorInternal(c, "Ошибка загрузки объявлений")
+			return
+		}
+		c.JSON(http.StatusOK, props)
+	}
+}
+
+// DeleteProperty handles DELETE /api/properties/:id (JWT, owner only).
+func DeleteProperty(propertyService *services.PropertyService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := middleware.GetUserID(c)
+		if !ok {
+			utils.JSONErrorUnauthorized(c, "Требуется авторизация")
+			return
+		}
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil || id < 1 {
+			utils.JSONErrorBadRequest(c, "Некорректный id")
+			return
+		}
+		err = propertyService.DeleteOwned(c.Request.Context(), userID, id)
+		if err != nil {
+			switch {
+			case errors.Is(err, services.ErrPropertyNotFound):
+				utils.JSONErrorNotFound(c, "Объявление не найдено")
+			case errors.Is(err, services.ErrPropertyForbidden):
+				utils.JSONErrorForbidden(c, "Нет доступа к этому объявлению")
+			default:
+				log.Printf("[properties] Delete: %v", err)
+				utils.JSONErrorInternal(c, "Ошибка удаления объявления")
+			}
+			return
+		}
+		c.Status(http.StatusNoContent)
+	}
+}
+
+// UpdateProperty handles PATCH /api/properties/:id (JSON или multipart: payload JSON + form existingPhotos + файлы photos).
+func UpdateProperty(propertyService *services.PropertyService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := middleware.GetUserID(c)
+		if !ok {
+			utils.JSONErrorUnauthorized(c, "Требуется авторизация")
+			return
+		}
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil || id < 1 {
+			utils.JSONErrorBadRequest(c, "Некорректный id")
+			return
+		}
+
+		var payload models.UpdatePropertyPayload
+		var newFiles []*multipart.FileHeader
+
+		ct := c.ContentType()
+		if strings.HasPrefix(ct, "multipart/") {
+			if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
+				utils.JSONErrorBadRequest(c, "Некорректный multipart")
+				return
+			}
+			payloadStr := c.PostForm("payload")
+			if payloadStr == "" {
+				payloadStr = "{}"
+			}
+			if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
+				utils.JSONErrorBadRequest(c, "Поле payload должно быть валидным JSON")
+				return
+			}
+			if c.Request.MultipartForm != nil && c.Request.MultipartForm.File != nil {
+				newFiles = c.Request.MultipartForm.File[propertyPhotosKey]
+			}
+			// Контракт: existingPhotos — JSON-массив строк в form-data (источник истины для старых фото).
+			existingPhotosRaw := strings.TrimSpace(c.PostForm(existingPhotosFormKey))
+			if existingPhotosRaw != "" {
+				var parsed []string
+				if err := json.Unmarshal([]byte(existingPhotosRaw), &parsed); err != nil {
+					utils.JSONErrorBadRequest(c, "Поле existingPhotos имеет неверный формат")
+					return
+				}
+				payload.ExistingPhotos = &parsed
+				log.Printf("[properties] PATCH multipart: existingPhotosRaw=%q parsedExistingPhotos=%v newFilesCount=%d",
+					existingPhotosRaw, parsed, len(newFiles))
+			}
+		} else {
+			if err := c.ShouldBindJSON(&payload); err != nil {
+				utils.JSONErrorBadRequest(c, "Некорректный JSON")
+				return
+			}
+		}
+
+		if !payload.HasMetaChanges() && len(newFiles) == 0 {
+			utils.JSONErrorBadRequest(c, "Нет данных для обновления")
+			return
+		}
+
+		var newURLs []string
+		if len(newFiles) > 0 {
+			if err := os.MkdirAll(propertyUploadDir, 0755); err != nil {
+				log.Printf("[properties] mkdir: %v", err)
+				utils.JSONErrorInternal(c, "Ошибка сохранения фото")
+				return
+			}
+			for _, f := range newFiles {
+				ext := filepath.Ext(f.Filename)
+				name := fmt.Sprintf("%d_%d%s", userID, time.Now().UnixNano(), ext)
+				dst := filepath.Join(propertyUploadDir, name)
+				if err := c.SaveUploadedFile(f, dst); err != nil {
+					log.Printf("[properties] save photo: %v", err)
+					utils.JSONErrorInternal(c, "Ошибка сохранения фото")
+					return
+				}
+				newURLs = append(newURLs, "/uploads/properties/"+name)
+			}
+		}
+
+		photos, err := propertyService.UpdateOwned(c.Request.Context(), userID, id, payload, newURLs)
+		if err != nil {
+			switch {
+			case errors.Is(err, services.ErrEmptyPropertyPatch):
+				utils.JSONErrorBadRequest(c, "Нет данных для обновления")
+			case errors.Is(err, services.ErrPropertyNotFound):
+				utils.JSONErrorNotFound(c, "Объявление не найдено")
+			case errors.Is(err, services.ErrPropertyForbidden):
+				utils.JSONErrorForbidden(c, "Нет доступа к этому объявлению")
+			case errors.Is(err, services.ErrInvalidCategoryPropertyType):
+				utils.JSONErrorBadRequest(c, "propertyType не соответствует category")
+			default:
+				log.Printf("[properties] Update: %v", err)
+				utils.JSONErrorInternal(c, "Ошибка обновления объявления")
+			}
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"photos": photos})
 	}
 }
 
