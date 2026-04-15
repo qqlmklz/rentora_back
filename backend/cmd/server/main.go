@@ -9,6 +9,7 @@ import (
 	"rentora/backend/internal/repository"
 	"rentora/backend/internal/routes"
 	"rentora/backend/internal/services"
+	"rentora/backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
@@ -36,11 +37,14 @@ func main() {
 	profileService := services.NewProfileService(db)
 	propertyService := services.NewPropertyService(db)
 	favoritesService := services.NewFavoritesService(db)
+	hub := ws.NewHub()
+	chatService := services.NewChatService(db, hub)
+	contractService := services.NewContractService(db, hub)
 
 	gin.SetMode(cfg.GinMode)
 	r := gin.New()
 
-	routes.Setup(r, cfg.CORSOrigins, authService, profileService, propertyService, favoritesService, cfg.JWTSecret)
+	routes.Setup(r, cfg.CORSOrigins, authService, profileService, propertyService, favoritesService, chatService, contractService, hub, cfg.JWTSecret)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("Rentora backend starting on %s", addr)

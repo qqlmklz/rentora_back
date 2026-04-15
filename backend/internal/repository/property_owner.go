@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ListPropertiesByUserID returns catalog-style cards for properties owned by userID.
+// Возвращаем карточки объявлений, которые принадлежат userID.
 func (db *DB) ListPropertiesByUserID(ctx context.Context, userID int) ([]models.Property, error) {
 	rows, err := db.Pool.Query(ctx, `
 		SELECT
@@ -66,7 +66,7 @@ func (db *DB) ListPropertiesByUserID(ctx context.Context, userID int) ([]models.
 	return out, nil
 }
 
-// DeletePropertyOwned deletes a property only if it belongs to userID.
+// Удаляем объявление только если оно принадлежит userID.
 func (db *DB) DeletePropertyOwned(ctx context.Context, propertyID, userID int) error {
 	cmd, err := db.Pool.Exec(ctx, `
 		DELETE FROM properties WHERE id = $1 AND user_id = $2
@@ -88,11 +88,11 @@ func (db *DB) DeletePropertyOwned(ctx context.Context, propertyID, userID int) e
 	if int(ownerID.Int64) != userID {
 		return ErrPropertyForbidden
 	}
-	// same owner but row was removed concurrently
+	// Владелец тот же, но строку могли удалить параллельно.
 	return ErrPropertyNotFound
 }
 
-// LoadPropertyForEdit loads full property row for merge/update. Returns ErrPropertyNotFound if missing.
+// Загружаем полную строку объявления для merge/update. Если не нашли, вернем ErrPropertyNotFound.
 func (db *DB) LoadPropertyForEdit(ctx context.Context, propertyID int) (ownerID int, in models.CreatePropertyInput, err error) {
 	row := db.Pool.QueryRow(ctx, `
 		SELECT
@@ -191,7 +191,7 @@ func (db *DB) LoadPropertyForEdit(ctx context.Context, propertyID int) (ownerID 
 	return ownerID, in, nil
 }
 
-// UpdatePropertyFull updates all mutable columns when the row belongs to userID (single statement).
+// Обновляем все изменяемые колонки, если строка принадлежит userID (одним запросом).
 func (db *DB) UpdatePropertyFull(ctx context.Context, propertyID, userID int, in models.CreatePropertyInput) error {
 	cmd, err := db.Pool.Exec(ctx, `
 		UPDATE properties SET
@@ -260,7 +260,7 @@ func (db *DB) UpdatePropertyFull(ctx context.Context, propertyID, userID int, in
 	return nil
 }
 
-// UpdatePropertyOwnedWithPhotos updates the row and property_images in one transaction.
+// В одной транзакции обновляем объявление и таблицу property_images.
 func (db *DB) UpdatePropertyOwnedWithPhotos(ctx context.Context, propertyID, userID int, in models.CreatePropertyInput, deleteURLs, insertURLs []string) error {
 	tx, err := db.Pool.Begin(ctx)
 	if err != nil {

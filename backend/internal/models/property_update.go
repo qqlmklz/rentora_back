@@ -1,6 +1,6 @@
 package models
 
-// UpdatePropertyPatch is JSON body for PATCH /api/properties/:id (all fields optional).
+// Тело JSON для PATCH /api/properties/:id (все поля опциональные).
 type UpdatePropertyPatch struct {
 	RentType            *string  `json:"rentType,omitempty"`
 	Category            *string  `json:"category,omitempty"`
@@ -28,21 +28,21 @@ type UpdatePropertyPatch struct {
 	HousingType         *string  `json:"housingType,omitempty"`
 }
 
-// UpdatePropertyPayload is JSON for PATCH /api/properties/:id (and optional "payload" in multipart).
-// ExistingPhotos: если задан (в т.ч. []), список URL фото, которые нужно оставить — истина для синхронизации с БД.
-// nil = не менять набор фото (только добавить новые из multipart, если есть).
-// Multipart: приоритетно передавайте form-поле existingPhotos (JSON-строка массива строк); при непустом значении оно подставляется в ExistingPhotos.
+// Тело PATCH /api/properties/:id (и еще можно передать как поле "payload" в multipart).
+// Поле ExistingPhotos: если задано (даже []), это список URL фото, которые оставляем в БД.
+// Если значение nil, значит старые фото не трогаем, а только добавляем новые из multipart (если они есть).
+// В multipart лучше передавать form-поле existingPhotos (JSON-строка массива); если оно непустое, кладем его в ExistingPhotos.
 type UpdatePropertyPayload struct {
 	UpdatePropertyPatch
 	ExistingPhotos *[]string `json:"existingPhotos,omitempty"`
 }
 
-// HasMetaChanges returns true if there are field updates or explicit photo list sync.
+// Возвращает true, если есть обновления полей или явная синхронизация списка фото.
 func (p UpdatePropertyPayload) HasMetaChanges() bool {
 	return !p.UpdatePropertyPatch.IsEmpty() || p.ExistingPhotos != nil
 }
 
-// IsEmpty returns true if no field is set.
+// Возвращает true, если ни одно поле не задано.
 func (p UpdatePropertyPatch) IsEmpty() bool {
 	return p.RentType == nil && p.Category == nil && p.PropertyType == nil && p.Title == nil &&
 		p.City == nil && p.District == nil && p.Price == nil && p.UtilitiesIncluded == nil &&
@@ -52,7 +52,7 @@ func (p UpdatePropertyPatch) IsEmpty() bool {
 		p.KitchenArea == nil && p.Floor == nil && p.TotalFloors == nil && p.HousingType == nil
 }
 
-// ApplyPropertyPatch merges patch into base (only non-nil patch fields).
+// Применяем patch к base: обновляем только те поля, которые не nil.
 func ApplyPropertyPatch(base *CreatePropertyInput, patch UpdatePropertyPatch) {
 	if patch.RentType != nil {
 		base.RentType = *patch.RentType

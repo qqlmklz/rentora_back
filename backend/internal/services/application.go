@@ -1,4 +1,4 @@
 package services
 
-// ApplicationService handles rental applications.
-// type ApplicationService struct { ... }
+// Сервис для заявок на аренду.
+// Пример: type ApplicationService struct { ... }

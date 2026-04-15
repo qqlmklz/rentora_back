@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RecoveryJSON returns a middleware that recovers from panics and responds with JSON.
+// Мидлварка, которая ловит panic и отдает JSON-ошибку.
 func RecoveryJSON() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {

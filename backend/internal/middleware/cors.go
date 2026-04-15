@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CORS returns a middleware that sets CORS headers based on allowed origins.
+// Мидлварка для CORS: выставляет заголовки по списку разрешенных origin.
 func CORS(origins []string) gin.HandlerFunc {
 	allowAll := false
 	for _, o := range origins {

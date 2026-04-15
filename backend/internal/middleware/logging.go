@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Logging returns a middleware that logs HTTP method, path, client IP, latency and status.
+// Мидлварка для логов: метод, путь, IP клиента, задержка и статус.
 func Logging() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()

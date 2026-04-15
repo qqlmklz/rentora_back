@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// User represents a user row in the database.
+// Модель строки пользователя в базе.
 type User struct {
 	ID           int       `json:"id"`
 	Name         string    `json:"name"`
@@ -14,7 +14,7 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// ToResponse returns a UserResponse for API responses (no password).
+// Формируем UserResponse для API-ответов (без пароля).
 func (u *User) ToResponse() UserResponse {
 	return UserResponse{ID: u.ID, Name: u.Name, Email: u.Email, Phone: u.Phone, Avatar: u.Avatar}
 }

@@ -7,12 +7,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// DB wraps pgx pool and provides migration.
+// Обертка над pgx pool + запуск миграций.
 type DB struct {
 	Pool *pgxpool.Pool
 }
 
-// NewDB creates a connection pool and runs migrations.
+// Создаем пул подключений и сразу прогоняем миграции.
 func NewDB(ctx context.Context, databaseURL string) (*DB, error) {
 	pool, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
@@ -32,7 +32,7 @@ func NewDB(ctx context.Context, databaseURL string) (*DB, error) {
 	return db, nil
 }
 
-// Close closes the connection pool.
+// Закрываем пул подключений.
 func (db *DB) Close() {
 	db.Pool.Close()
 }
@@ -105,7 +105,7 @@ func (db *DB) migrate(ctx context.Context) error {
 		return err
 	}
 
-	// Backward compatible columns for old schema (if table existed already).
+	// Для старой схемы: добавляем недостающие колонки, если таблица уже была создана раньше.
 	_, err = db.Pool.Exec(ctx, `
 		ALTER TABLE properties
 			ADD COLUMN IF NOT EXISTS user_id INT,
@@ -135,7 +135,7 @@ func (db *DB) migrate(ctx context.Context) error {
 		return err
 	}
 
-	// Fix old 'area' column if exists - make it nullable or set default
+	// Для старой колонки 'area': если есть, убираем NOT NULL и ставим дефолт.
 	_, _ = db.Pool.Exec(ctx, `ALTER TABLE properties ALTER COLUMN area DROP NOT NULL`)
 	_, _ = db.Pool.Exec(ctx, `ALTER TABLE properties ALTER COLUMN area SET DEFAULT 0`)
 	if err != nil {
@@ -150,5 +150,124 @@ func (db *DB) migrate(ctx context.Context) error {
 			created_at  TIMESTAMP NOT NULL DEFAULT NOW()
 		)
 	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS chats (
+			id          SERIAL PRIMARY KEY,
+			property_id INT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+			seller_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			buyer_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+			CHECK (seller_id <> buyer_id),
+			UNIQUE (property_id, seller_id, buyer_id)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS messages (
+			id         SERIAL PRIMARY KEY,
+			chat_id    INT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+			sender_id  INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			text       TEXT NOT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT FALSE`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_system BOOLEAN NOT NULL DEFAULT FALSE`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS contracts (
+			id            SERIAL PRIMARY KEY,
+			chat_id       INT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+			property_id   INT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+			landlord_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			tenant_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			contract_text TEXT NOT NULL,
+			status        TEXT NOT NULL CHECK (status IN ('draft', 'pending', 'accepted', 'rejected', 'terminated')),
+			created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at    TIMESTAMP NOT NULL DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_contracts_chat ON contracts(chat_id)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_contracts_landlord ON contracts(landlord_id)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_contracts_tenant ON contracts(tenant_id)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_contracts_status_accepted ON contracts(landlord_id, tenant_id, status)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE contracts ADD COLUMN IF NOT EXISTS contract_data JSONB NOT NULL DEFAULT '{}'::jsonb`)
+	if err != nil {
+		return err
+	}
+	// Обновляем CHECK по status, потому что в старых БД без 'terminated' падал UPDATE при расторжении.
+	_, _ = db.Pool.Exec(ctx, `ALTER TABLE contracts DROP CONSTRAINT IF EXISTS contracts_status_check`)
+	_, err = db.Pool.Exec(ctx, `
+		ALTER TABLE contracts ADD CONSTRAINT contracts_status_check
+		CHECK (status IN ('draft', 'pending', 'accepted', 'rejected', 'terminated'))
+	`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type TEXT NOT NULL DEFAULT 'text'`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE messages ADD COLUMN IF NOT EXISTS contract_id INT REFERENCES contracts(id) ON DELETE SET NULL`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_messages_contract_id ON messages(contract_id)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE messages SET message_type = 'system' WHERE is_system = true AND message_type = 'text'`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE messages ADD COLUMN IF NOT EXISTS contract_status TEXT`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `
+		UPDATE messages m
+		SET contract_status = c.status
+		FROM contracts c
+		WHERE m.contract_id = c.id AND m.message_type = 'contract'
+		  AND (m.contract_status IS NULL OR m.contract_status = '')
+	`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_chats_user ON chats(seller_id, buyer_id)`)
 	return err
 }

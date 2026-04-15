@@ -13,12 +13,12 @@ import (
 	"rentora/backend/internal/repository"
 )
 
-// PropertyService handles property listing and CRUD.
+// Сервис для объявлений: список, детали и CRUD-операции.
 type PropertyService struct {
 	repo *repository.DB
 }
 
-// NewPropertyService creates a PropertyService.
+// Конструктор PropertyService.
 func NewPropertyService(repo *repository.DB) *PropertyService {
 	return &PropertyService{repo: repo}
 }
@@ -28,7 +28,7 @@ var (
 	ErrEmptyPropertyPatch          = errors.New("empty property patch")
 )
 
-// CatalogFilters describes incoming filters for catalog.
+// Фильтры, которые приходят для каталога.
 type CatalogFilters struct {
 	Category     string
 	PropertyType string
@@ -39,7 +39,7 @@ type CatalogFilters struct {
 	Sort         string
 }
 
-// ListForCatalog returns properties for /catalog with filters and sort applied.
+// Возвращаем объявления для /catalog с примененными фильтрами и сортировкой.
 func (s *PropertyService) ListForCatalog(ctx context.Context, f CatalogFilters) ([]models.Property, error) {
 	return s.repo.ListProperties(ctx, repository.PropertyFilters{
 		Category:     f.Category,
@@ -52,7 +52,7 @@ func (s *PropertyService) ListForCatalog(ctx context.Context, f CatalogFilters) 
 	})
 }
 
-// Create creates property and saves image urls. Validates category and propertyType.
+// Создаем объявление и сохраняем URL фото. Заодно проверяем связку category и propertyType.
 func (s *PropertyService) Create(ctx context.Context, userID int, in models.CreatePropertyInput, imageURLs []string) (int, error) {
 	if !isPropertyTypeAllowed(in.Category, in.PropertyType) {
 		return 0, ErrInvalidCategoryPropertyType
@@ -60,24 +60,24 @@ func (s *PropertyService) Create(ctx context.Context, userID int, in models.Crea
 	return s.repo.CreatePropertyWithImages(ctx, userID, in, imageURLs)
 }
 
-// GetByID returns a single property for the public detail page.
+// Возвращаем одно объявление для публичной страницы деталей.
 func (s *PropertyService) GetByID(ctx context.Context, id int) (*models.PropertyDetail, error) {
 	return s.repo.GetPropertyByID(ctx, id)
 }
 
-// ListMine returns properties owned by the user (card shape).
+// Возвращаем объявления пользователя в формате карточек.
 func (s *PropertyService) ListMine(ctx context.Context, userID int) ([]models.Property, error) {
 	return s.repo.ListPropertiesByUserID(ctx, userID)
 }
 
-// DeleteOwned deletes a property if it belongs to userID.
+// Удаляем объявление только если оно принадлежит userID.
 func (s *PropertyService) DeleteOwned(ctx context.Context, userID, propertyID int) error {
 	return s.repo.DeletePropertyOwned(ctx, propertyID, userID)
 }
 
-// UpdateOwned applies payload and syncs photos: if ExistingPhotos != nil, DB becomes existingPhotos ∪ newPhotoURLs;
-// if ExistingPhotos == nil, only appends newPhotoURLs (старые не трогаем).
-// Returns актуальный список image_url из property_images после успешного сохранения.
+// Применяем payload и синхронизируем фото: если ExistingPhotos != nil, в БД оставляем existingPhotos ∪ newPhotoURLs;
+// если ExistingPhotos == nil, просто добавляем newPhotoURLs (старые не трогаем).
+// На выходе возвращаем актуальный список image_url из property_images после успешного сохранения.
 func (s *PropertyService) UpdateOwned(ctx context.Context, userID, propertyID int, payload models.UpdatePropertyPayload, newPhotoURLs []string) ([]string, error) {
 	if !payload.HasMetaChanges() && len(newPhotoURLs) == 0 {
 		return nil, ErrEmptyPropertyPatch
@@ -129,7 +129,7 @@ func (s *PropertyService) UpdateOwned(ctx context.Context, userID, propertyID in
 	return final, nil
 }
 
-// urlMatchesExistingPhotos returns true if dbURL is listed in existingPhotos (фронт может прислать полный путь или только имя файла).
+// Возвращает true, если dbURL есть в existingPhotos (фронт может прислать полный путь или только имя файла).
 func urlMatchesExistingPhotos(dbURL string, existingPhotos []string) bool {
 	dbURL = strings.TrimSpace(dbURL)
 	for _, k := range existingPhotos {
@@ -170,7 +170,7 @@ func urlMatchesSingle(dbURL, k string) bool {
 	if nd != "" && nk != "" && nd == nk {
 		return true
 	}
-	// фронт может прислать только имя файла, в БД — путь /uploads/properties/...
+	// Фронт иногда шлет только имя файла, а в БД лежит полный путь /uploads/properties/....
 	if filepath.Base(nd) != "" && filepath.Base(nd) == filepath.Base(nk) {
 		return true
 	}
@@ -194,7 +194,7 @@ func localUploadPath(url string) string {
 }
 
 func isPropertyTypeAllowed(category, propertyType string) bool {
-	// category: "жилая" / "коммерческая" (accept also "residential"/"commercial" later if needed)
+	// Категорию ждем как "жилая" / "коммерческая" (если надо, потом добавим и residential/commercial).
 	residential := map[string]bool{
 		"квартира": true, "комната": true, "дом/дача": true, "коттедж": true,
 	}
@@ -207,7 +207,7 @@ func isPropertyTypeAllowed(category, propertyType string) bool {
 	case "коммерческая":
 		return commercial[propertyType]
 	default:
-		// if category not recognized, let handler treat it as bad request
+		// Если category не распознали, дальше обработчик вернет bad request.
 		return false
 	}
 }

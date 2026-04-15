@@ -4,17 +4,19 @@ import (
 	"rentora/backend/internal/handlers"
 	"rentora/backend/internal/middleware"
 	"rentora/backend/internal/services"
+	"rentora/backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Setup configures all routes and middleware on the given engine.
-func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthService, profileService *services.ProfileService, propertyService *services.PropertyService, favoritesService *services.FavoritesService, jwtSecret string) {
+// Тут настраиваем все роуты и middleware на переданном движке.
+func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthService, profileService *services.ProfileService, propertyService *services.PropertyService, favoritesService *services.FavoritesService, chatService *services.ChatService, contractService *services.ContractService, hub *ws.Hub, jwtSecret string) {
 	r.Use(middleware.RecoveryJSON())
 	r.Use(middleware.Logging())
 	r.Use(middleware.CORS(corsOrigins))
 
 	r.Static("/uploads", "uploads")
+	r.GET("/ws/chats", handlers.ChatWebSocket(hub, jwtSecret, corsOrigins))
 
 	api := r.Group("/api")
 	{
@@ -24,7 +26,7 @@ func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthServic
 		authRoutes(auth, authService, jwtSecret)
 
 		profile := api.Group("/profile")
-		profileRoutes(profile, profileService, propertyService, jwtSecret)
+		profileRoutes(profile, profileService, propertyService, contractService, jwtSecret)
 
 		users := api.Group("/users")
 		userRoutes(users)
@@ -37,6 +39,16 @@ func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthServic
 
 		favorites := api.Group("/favorites")
 		favoriteRoutes(favorites, favoritesService, jwtSecret)
+
+		chats := api.Group("/chats")
+		chatRoutes(chats, chatService, contractService, jwtSecret)
+
+		contracts := api.Group("/contracts")
+		contracts.Use(middleware.Auth(jwtSecret))
+		contracts.GET("/:id", handlers.GetContract(contractService))
+		contracts.PATCH("/:id/accept", handlers.AcceptContract(contractService))
+		contracts.PATCH("/:id/reject", handlers.RejectContract(contractService))
+		contracts.PATCH("/:id/terminate", handlers.TerminateContract(contractService))
 	}
 }
 
@@ -46,7 +58,7 @@ func authRoutes(g *gin.RouterGroup, authService *services.AuthService, jwtSecret
 	g.GET("/me", middleware.Auth(jwtSecret), handlers.Me(authService))
 }
 
-func profileRoutes(g *gin.RouterGroup, profileService *services.ProfileService, propertyService *services.PropertyService, jwtSecret string) {
+func profileRoutes(g *gin.RouterGroup, profileService *services.ProfileService, propertyService *services.PropertyService, contractService *services.ContractService, jwtSecret string) {
 	g.Use(middleware.Auth(jwtSecret))
 	g.GET("", handlers.GetProfile(profileService))
 	g.PATCH("", handlers.UpdateProfile(profileService))
@@ -54,26 +66,27 @@ func profileRoutes(g *gin.RouterGroup, profileService *services.ProfileService, 
 	g.DELETE("/avatar", handlers.DeleteAvatar(profileService))
 	g.PATCH("/password", handlers.UpdatePassword(profileService))
 	g.GET("/properties", handlers.GetMyProperties(propertyService))
+	g.GET("/documents", handlers.GetProfileDocuments(contractService))
 }
 
 func userRoutes(g *gin.RouterGroup) {
-	// GET/PUT /api/users/:id, etc.
+	// Здесь будут маршруты пользователей (GET/PUT /api/users/:id и другие).
 }
 
 func propertyRoutes(g *gin.RouterGroup, propertyService *services.PropertyService, jwtSecret string) {
-	// Catalog: list properties with filters.
+	// Каталог: список объявлений с фильтрами.
 	g.GET("", handlers.GetProperties(propertyService))
-	// Create property: authorized only.
+	// Создание объявления: только для авторизованных.
 	g.POST("", middleware.Auth(jwtSecret), handlers.CreateProperty(propertyService))
-	// Single property (public; optional JWT for owner-only fields).
+	// Одно объявление: публично, но с JWT можем показать поля только для владельца.
 	g.GET("/:id", handlers.GetPropertyByID(propertyService, jwtSecret))
-	// Owner-only (JWT).
+	// Действия только для владельца (JWT обязателен).
 	g.DELETE("/:id", middleware.Auth(jwtSecret), handlers.DeleteProperty(propertyService))
 	g.PATCH("/:id", middleware.Auth(jwtSecret), handlers.UpdateProperty(propertyService))
 }
 
 func applicationRoutes(g *gin.RouterGroup) {
-	// GET/POST /api/applications, etc.
+	// Здесь будут маршруты заявок (GET/POST /api/applications и т.д.).
 }
 
 func favoriteRoutes(g *gin.RouterGroup, favService *services.FavoritesService, jwtSecret string) {
@@ -81,4 +94,18 @@ func favoriteRoutes(g *gin.RouterGroup, favService *services.FavoritesService, j
 	g.GET("", handlers.GetFavorites(favService))
 	g.POST("/:propertyId", handlers.AddFavorite(favService))
 	g.DELETE("/:propertyId", handlers.RemoveFavorite(favService))
+}
+
+// В chatRoutes везде нужен JWT, а доступ есть только у seller_id/buyer_id (подробности в handlers + services/chat).
+func chatRoutes(g *gin.RouterGroup, chatService *services.ChatService, contractService *services.ContractService, jwtSecret string) {
+	g.Use(middleware.Auth(jwtSecret))
+	g.POST("", handlers.CreateChat(chatService))
+	g.GET("", handlers.ListChats(chatService))
+	// Сначала добавляем маршруты с суффиксом, чтобы их не перехватывал общий GET /:id.
+	g.GET("/:id/contract-draft", handlers.GetContractDraft(contractService))
+	g.GET("/:id/messages", handlers.GetChatMessages(chatService))
+	g.POST("/:id/contracts", handlers.CreateChatContract(contractService))
+	g.PATCH("/:id/read", handlers.MarkChatRead(chatService))
+	g.POST("/:id/messages", handlers.SendChatMessage(chatService))
+	g.GET("/:id", handlers.GetChat(chatService))
 }

@@ -11,26 +11,26 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// AuthService handles login, register, token refresh.
+// Сервис авторизации: регистрация, логин и работа с токеном.
 type AuthService struct {
 	repo   *repository.DB
 	secret string
 }
 
-// NewAuthService creates an AuthService.
+// Конструктор AuthService.
 func NewAuthService(repo *repository.DB, jwtSecret string) *AuthService {
 	return &AuthService{repo: repo, secret: jwtSecret}
 }
 
-// ErrUserExists is returned when registering with an existing email.
+// Ошибка, если при регистрации email уже занят.
 var ErrUserExists = errors.New("user with this email already exists")
 
-// ErrInvalidCredentials is returned when login email or password is wrong.
+// Ошибка, если при логине неверный email или пароль.
 var ErrInvalidCredentials = errors.New("invalid email or password")
 
 const bcryptCost = 12
 
-// Register creates a new user. Returns ErrUserExists if email is taken.
+// Регистрируем нового пользователя. Если email занят, вернем ErrUserExists.
 func (s *AuthService) Register(ctx context.Context, name, email, password string) error {
 	existing, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -60,7 +60,7 @@ func (s *AuthService) Register(ctx context.Context, name, email, password string
 	return nil
 }
 
-// Login finds user by email, checks password, returns user and JWT or ErrInvalidCredentials.
+// Ищем пользователя по email, проверяем пароль и возвращаем user+JWT или ErrInvalidCredentials.
 func (s *AuthService) Login(ctx context.Context, email, password string) (*models.User, string, error) {
 	u, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -79,7 +79,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*model
 	return u, token, nil
 }
 
-// GetUserByID returns user by ID (for /me). Returns nil if not found.
+// Возвращаем пользователя по ID (для /me). Если не нашли, вернем nil.
 func (s *AuthService) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	return s.repo.GetUserByID(ctx, id)
 }

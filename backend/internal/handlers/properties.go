@@ -28,7 +28,7 @@ const (
 	propertyUploadDir       = "uploads/properties"
 )
 
-// GetProperties handles GET /api/properties for catalog.
+// Обработчик GET /api/properties для каталога.
 func GetProperties(propertyService *services.PropertyService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		filters := services.CatalogFilters{
@@ -56,7 +56,7 @@ func GetProperties(propertyService *services.PropertyService) gin.HandlerFunc {
 
 		props, err := propertyService.ListForCatalog(c.Request.Context(), filters)
 		if err != nil {
-			// For catalog we just return generic 500; logging can be added later.
+			// Для каталога пока отдаем общий 500; если нужно, потом добавим отдельное логирование.
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Ошибка загрузки объявлений"})
 			return
 		}
@@ -64,7 +64,7 @@ func GetProperties(propertyService *services.PropertyService) gin.HandlerFunc {
 	}
 }
 
-// GetPropertyByID handles GET /api/properties/:id (public). Optional Bearer JWT: owner sees apartmentNumber.
+// Обработчик GET /api/properties/:id (публичный). С Bearer JWT владелец видит apartmentNumber.
 func GetPropertyByID(propertyService *services.PropertyService, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.Param("id")
@@ -91,7 +91,7 @@ func GetPropertyByID(propertyService *services.PropertyService, jwtSecret string
 	}
 }
 
-// CreateProperty handles POST /api/properties (multipart/form-data).
+// Обработчик POST /api/properties (multipart/form-data).
 func CreateProperty(propertyService *services.PropertyService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -100,7 +100,7 @@ func CreateProperty(propertyService *services.PropertyService) gin.HandlerFunc {
 			return
 		}
 
-		// Parse required basic fields.
+		// Сначала парсим обязательные базовые поля.
 		in, err := parseCreatePropertyInput(c)
 		if err != nil {
 			utils.JSONErrorBadRequest(c, err.Error())
@@ -158,7 +158,7 @@ func CreateProperty(propertyService *services.PropertyService) gin.HandlerFunc {
 	}
 }
 
-// GetMyProperties handles GET /api/profile/properties (JWT).
+// Обработчик GET /api/profile/properties (JWT).
 func GetMyProperties(propertyService *services.PropertyService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -176,7 +176,7 @@ func GetMyProperties(propertyService *services.PropertyService) gin.HandlerFunc 
 	}
 }
 
-// DeleteProperty handles DELETE /api/properties/:id (JWT, owner only).
+// Обработчик DELETE /api/properties/:id (JWT, только владелец).
 func DeleteProperty(propertyService *services.PropertyService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -206,7 +206,7 @@ func DeleteProperty(propertyService *services.PropertyService) gin.HandlerFunc {
 	}
 }
 
-// UpdateProperty handles PATCH /api/properties/:id (JSON или multipart: payload JSON + form existingPhotos + файлы photos).
+// Обработчик PATCH /api/properties/:id (JSON или multipart: payload JSON + existingPhotos + файлы photos).
 func UpdateProperty(propertyService *services.PropertyService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -240,7 +240,7 @@ func UpdateProperty(propertyService *services.PropertyService) gin.HandlerFunc {
 			if c.Request.MultipartForm != nil && c.Request.MultipartForm.File != nil {
 				newFiles = c.Request.MultipartForm.File[propertyPhotosKey]
 			}
-			// Контракт: existingPhotos — JSON-массив строк в form-data (источник истины для старых фото).
+			// Важно: existingPhotos — это JSON-массив строк в form-data, по нему синхронизируем старые фото.
 			existingPhotosRaw := strings.TrimSpace(c.PostForm(existingPhotosFormKey))
 			if existingPhotosRaw != "" {
 				var parsed []string
@@ -308,9 +308,9 @@ func UpdateProperty(propertyService *services.PropertyService) gin.HandlerFunc {
 func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error) {
 	get := func(key string) string { return c.PostForm(key) }
 
-	// ===== МАППИНГ ЗНАЧЕНИЙ =====
+	// Маппинг входных значений.
 
-	// rentType: long -> долгосрочная, daily -> посуточная
+	// Поле rentType: long -> долгосрочная, daily -> посуточная.
 	mapRentType := func(v string) string {
 		switch v {
 		case "long":
@@ -322,7 +322,7 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		}
 	}
 
-	// category: residential -> жилая, commercial -> коммерческая
+	// Поле category: residential -> жилая, commercial -> коммерческая.
 	mapCategory := func(v string) string {
 		switch v {
 		case "residential":
@@ -334,7 +334,7 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		}
 	}
 
-	// subcategory -> propertyType
+	// Поле subcategory переводим в propertyType.
 	mapPropertyType := func(v string) string {
 		switch v {
 		case "apartment":
@@ -358,7 +358,7 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		}
 	}
 
-	// residentialType -> housingType
+	// Поле residentialType переводим в housingType.
 	mapHousingType := func(v string) string {
 		switch v {
 		case "flat":
@@ -370,7 +370,7 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		}
 	}
 
-	// prepayment: 0 -> нет, 1 -> 1 месяц, 2 -> 2 месяца
+	// Поле prepayment: 0 -> нет, 1 -> 1 месяц, 2 -> 2 месяца.
 	mapPrepayment := func(v string) string {
 		switch v {
 		case "0":
@@ -384,7 +384,7 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		}
 	}
 
-	// ===== ЧТЕНИЕ И ПРЕОБРАЗОВАНИЕ ПОЛЕЙ =====
+	// Читаем поля и приводим к нужному формату.
 
 	categoryRaw := get("category")
 	category := mapCategory(categoryRaw)
@@ -400,7 +400,7 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		District:     get("district"),
 	}
 
-	// ===== ПРОВЕРКА ОБЯЗАТЕЛЬНЫХ ПОЛЕЙ =====
+	// Проверяем, что обязательные поля реально пришли.
 
 	var missing []string
 	if get("title") == "" {
@@ -437,9 +437,9 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		return models.CreatePropertyInput{}, fmt.Errorf("Не заполнены обязательные поля: %s", strings.Join(missing, ", "))
 	}
 
-	// ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+	// Локальные вспомогательные функции для парсинга.
 
-	// Парсинг bool: true/false/included/not_included
+	// Парсим bool: true/false/included/not_included.
 	parseBool := func(key string) (bool, error) {
 		s := get(key)
 		if s == "" {
@@ -455,7 +455,7 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		}
 	}
 
-	// Парсинг int
+	// Парсим int.
 	atoi := func(key string) (int, bool, error) {
 		s := get(key)
 		if s == "" {
@@ -468,7 +468,7 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		return i, true, nil
 	}
 
-	// Парсинг float
+	// Парсим float.
 	atof := func(key string) (float64, bool, error) {
 		s := get(key)
 		if s == "" {
@@ -481,24 +481,24 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		return f, true, nil
 	}
 
-	// ===== ПАРСИНГ ЧИСЛОВЫХ ПОЛЕЙ =====
+	// Разбираем числовые поля.
 
-	// price (обязательное)
+	// Поле цены (обязательное).
 	price, _, err := atoi("price")
 	if err != nil {
 		return models.CreatePropertyInput{}, err
 	}
 	req.Price = price
 
-	// totalArea (обязательное)
+	// Поле totalArea (обязательное).
 	totalArea, _, err := atof("totalArea")
 	if err != nil {
 		return models.CreatePropertyInput{}, err
 	}
 	req.TotalArea = totalArea
 
-	// rooms: studio -> 0, 6+ -> 6, иначе число
-	// Для коммерческой недвижимости не обязателен
+	// Поле rooms: studio -> 0, 6+ -> 6, иначе обычное число.
+	// Для коммерческой недвижимости rooms не обязателен.
 	roomsStr := get("rooms")
 	if roomsStr != "" {
 		switch roomsStr {
@@ -514,19 +514,19 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 			req.Rooms = rooms
 		}
 	} else if !isCommercial {
-		// rooms обязателен для жилой недвижимости — но не добавляем в missing, т.к. уже проверили выше
+		// Для жилой недвижимости rooms обязателен, но в missing не дублируем — уже проверили выше.
 	}
 
-	// ===== ПАРСИНГ BOOL ПОЛЕЙ =====
+	// Разбираем bool-поля.
 
-	// utilitiesIncluded (обязательное)
+	// Поле utilitiesIncluded (обязательное).
 	utilsIncluded, err := parseBool("utilitiesIncluded")
 	if err != nil {
 		return models.CreatePropertyInput{}, err
 	}
 	req.UtilitiesIncluded = utilsIncluded
 
-	// utilitiesPrice: обязателен, если utilitiesIncluded = false (not_included)
+	// Поле utilitiesPrice обязательно, если utilitiesIncluded = false (not_included).
 	if !utilsIncluded {
 		if get("utilitiesPrice") == "" {
 			return models.CreatePropertyInput{}, fmt.Errorf("Поле utilitiesPrice обязательно, если utilitiesIncluded = not_included")
@@ -538,80 +538,80 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		req.UtilitiesPrice = &v
 	}
 
-	// allowChildren -> childrenAllowed
+	// Поле allowChildren переводим в childrenAllowed.
 	childrenAllowed, err := parseBool("allowChildren")
 	if err != nil {
 		return models.CreatePropertyInput{}, err
 	}
 	req.ChildrenAllowed = childrenAllowed
 
-	// allowPets -> petsAllowed
+	// Поле allowPets переводим в petsAllowed.
 	petsAllowed, err := parseBool("allowPets")
 	if err != nil {
 		return models.CreatePropertyInput{}, err
 	}
 	req.PetsAllowed = petsAllowed
 
-	// ===== ОПЦИОНАЛЬНЫЕ ПОЛЯ =====
+	// Разбираем необязательные поля.
 
-	// metro
+	// поле metro.
 	if v := get("metro"); v != "" {
 		req.Metro = &v
 	}
 
-	// apartmentNumber
+	// поле apartmentNumber.
 	if v := get("apartmentNumber"); v != "" {
 		req.ApartmentNumber = &v
 	}
 
-	// residentialType -> housingType (не обязательно для коммерческой)
+	// Поле residentialType переводим в housingType (для коммерческой не обязательно).
 	if v := get("residentialType"); v != "" {
 		ht := mapHousingType(v)
 		req.HousingType = &ht
 	}
 
-	// deposit
+	// поле deposit.
 	if v, has, err := atoi("deposit"); err != nil {
 		return models.CreatePropertyInput{}, err
 	} else if has {
 		req.Deposit = &v
 	}
 
-	// commission -> commissionPercent
+	// поле commission перекладываем в commissionPercent.
 	if v, has, err := atoi("commission"); err != nil {
 		return models.CreatePropertyInput{}, err
 	} else if has {
 		req.CommissionPercent = &v
 	}
 
-	// prepayment
+	// поле prepayment.
 	if v := get("prepayment"); v != "" {
 		p := mapPrepayment(v)
 		req.Prepayment = &p
 	}
 
-	// livingArea
+	// поле livingArea.
 	if v, has, err := atof("livingArea"); err != nil {
 		return models.CreatePropertyInput{}, err
 	} else if has {
 		req.LivingArea = &v
 	}
 
-	// kitchenArea
+	// поле kitchenArea.
 	if v, has, err := atof("kitchenArea"); err != nil {
 		return models.CreatePropertyInput{}, err
 	} else if has {
 		req.KitchenArea = &v
 	}
 
-	// floor
+	// поле floor.
 	if v, has, err := atoi("floor"); err != nil {
 		return models.CreatePropertyInput{}, err
 	} else if has {
 		req.Floor = &v
 	}
 
-	// floorsTotal -> totalFloors
+	// поле floorsTotal перекладываем в totalFloors.
 	if v, has, err := atoi("floorsTotal"); err != nil {
 		return models.CreatePropertyInput{}, err
 	} else if has {

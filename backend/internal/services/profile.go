@@ -10,28 +10,28 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// ProfileService handles profile operations.
+// Сервис операций с профилем пользователя.
 type ProfileService struct {
 	repo *repository.DB
 }
 
-// NewProfileService creates a ProfileService.
+// Конструктор ProfileService.
 func NewProfileService(repo *repository.DB) *ProfileService {
 	return &ProfileService{repo: repo}
 }
 
-// ErrEmailTaken is returned when updating profile with an email that belongs to another user.
+// Ошибка, когда при обновлении профиля email уже занят другим пользователем.
 var ErrEmailTaken = errors.New("email already taken")
 
-// ErrWrongPassword is returned when current password does not match.
+// Ошибка, когда текущий пароль не совпал.
 var ErrWrongPassword = errors.New("wrong current password")
 
-// GetProfile returns user by ID (caller must ensure user exists).
+// Возвращаем пользователя по ID (вызывающий код сам решает, что делать если его нет).
 func (s *ProfileService) GetProfile(ctx context.Context, userID int) (*models.User, error) {
 	return s.repo.GetUserByID(ctx, userID)
 }
 
-// UpdateProfile updates name, email, phone. Returns ErrEmailTaken if email is taken by another user.
+// Обновляем name/email/phone. Если email занят другим пользователем, вернем ErrEmailTaken.
 func (s *ProfileService) UpdateProfile(ctx context.Context, userID int, name, email string, phone *string) error {
 	other, err := s.repo.GetUserByEmailExcludingID(ctx, email, userID)
 	if err != nil {
@@ -43,17 +43,17 @@ func (s *ProfileService) UpdateProfile(ctx context.Context, userID int, name, em
 	return s.repo.UpdateProfile(ctx, userID, name, email, phone)
 }
 
-// UpdateAvatar saves avatar path for user.
+// Сохраняем путь к аватару пользователя.
 func (s *ProfileService) UpdateAvatar(ctx context.Context, userID int, avatarPath string) error {
 	return s.repo.UpdateAvatar(ctx, userID, &avatarPath)
 }
 
-// DeleteAvatar clears avatar for user.
+// Очищаем аватар пользователя.
 func (s *ProfileService) DeleteAvatar(ctx context.Context, userID int) error {
 	return s.repo.UpdateAvatar(ctx, userID, nil)
 }
 
-// UpdatePassword verifies current password and sets new one. Returns ErrWrongPassword if current is wrong.
+// Проверяем текущий пароль и ставим новый. Если текущий неверный, вернем ErrWrongPassword.
 func (s *ProfileService) UpdatePassword(ctx context.Context, userID int, currentPassword, newPassword string) error {
 	u, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil || u == nil {

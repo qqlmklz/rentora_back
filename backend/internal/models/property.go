@@ -1,7 +1,7 @@
 package models
 
-// Property represents a listing used in catalog and favorites.
-// This struct is focused on card data; extend when details page is added.
+// Базовая модель объявления для каталога и избранного.
+// Здесь только поля карточки; если нужно, для страницы деталей можно расширить.
 type Property struct {
 	ID           int      `json:"id"`
 	Title        string   `json:"title"`

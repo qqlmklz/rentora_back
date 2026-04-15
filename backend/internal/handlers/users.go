@@ -1,3 +1,3 @@
 package handlers
 
-// User handlers (GetByID, Update, etc.) will go here.
+// Здесь будут хендлеры пользователей (GetByID, Update и т.д.).

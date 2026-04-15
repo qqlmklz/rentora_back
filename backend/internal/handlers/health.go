@@ -6,13 +6,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// HealthResponse is the response body for GET /api/health.
+// Тело ответа для GET /api/health.
 type HealthResponse struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
 }
 
-// Health returns a handler for the health check endpoint.
+// Хендлер для health-check эндпоинта.
 func Health(c *gin.Context) {
 	c.JSON(http.StatusOK, HealthResponse{
 		Status:  "ok",

@@ -1,7 +1,7 @@
 package models
 
-// PropertyDetail is the response for GET /api/properties/:id.
-// apartmentNumber is only included for the owner (when JWT matches owner).
+// Ответ для GET /api/properties/:id.
+// Номер квартиры отдаем только владельцу (когда JWT совпадает с owner).
 type PropertyDetail struct {
 	ID                  int      `json:"id"`
 	Title               string   `json:"title"`

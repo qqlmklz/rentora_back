@@ -28,13 +28,13 @@ var allowedAvatarTypes = map[string]bool{
 	"image/jpeg": true, "image/png": true, "image/gif": true, "image/webp": true,
 }
 
-// profileResponse returns UserResponse with avatar as full URL path when set.
+// Собираем UserResponse и, если есть avatar, приводим его к полному URL-пути.
 func profileResponse(u *models.User) models.UserResponse {
 	r := u.ToResponse()
 	if u.Avatar != nil && *u.Avatar != "" {
-		// Backward compatible:
-		// - new format stored in DB: "/uploads/avatars/filename.jpg"
-		// - old format stored in DB: "avatars/filename.jpg"
+		// Для обратной совместимости поддерживаем оба формата:
+		// - новый формат в БД: "/uploads/avatars/filename.jpg"
+		// - старый формат в БД: "avatars/filename.jpg"
 		if strings.HasPrefix(*u.Avatar, "/") {
 			r.Avatar = u.Avatar
 		} else {
@@ -45,7 +45,7 @@ func profileResponse(u *models.User) models.UserResponse {
 	return r
 }
 
-// GetProfile returns the current user's profile (id, name, email, phone, avatar).
+// Возвращаем профиль текущего пользователя (id, name, email, phone, avatar).
 func GetProfile(profileService *services.ProfileService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -67,7 +67,7 @@ func GetProfile(profileService *services.ProfileService) gin.HandlerFunc {
 	}
 }
 
-// UpdateProfile updates name, email, phone.
+// Обновляем name, email и phone.
 func UpdateProfile(profileService *services.ProfileService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -115,7 +115,7 @@ func UpdateProfile(profileService *services.ProfileService) gin.HandlerFunc {
 	}
 }
 
-// UpdateAvatar handles multipart file upload and saves avatar path.
+// Обрабатываем загрузку аватарки через multipart и сохраняем путь.
 func UpdateAvatar(profileService *services.ProfileService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -182,7 +182,7 @@ func UpdateAvatar(profileService *services.ProfileService) gin.HandlerFunc {
 	}
 }
 
-// DeleteAvatar removes avatar for the current user.
+// Удаляем аватар текущего пользователя.
 func DeleteAvatar(profileService *services.ProfileService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -204,7 +204,7 @@ func DeleteAvatar(profileService *services.ProfileService) gin.HandlerFunc {
 	}
 }
 
-// UpdatePassword changes password after verifying current one.
+// Меняем пароль после проверки текущего.
 func UpdatePassword(profileService *services.ProfileService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)

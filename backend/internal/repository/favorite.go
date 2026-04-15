@@ -9,12 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// ErrFavoriteExists is returned when favorite already exists for user/property.
+// Ошибка, когда такая запись в избранном уже существует для user/property.
 var ErrFavoriteExists = errors.New("favorite already exists")
 
-// AddFavorite adds property to user's favorites.
+// Добавляем объявление в избранное пользователя.
 func (db *DB) AddFavorite(ctx context.Context, userID, propertyID int) error {
-	// Ensure property exists.
+	// Сначала убеждаемся, что объявление вообще существует.
 	var exists bool
 	if err := db.Pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM properties WHERE id = $1)`, propertyID).Scan(&exists); err != nil {
 		return err
@@ -28,7 +28,7 @@ func (db *DB) AddFavorite(ctx context.Context, userID, propertyID int) error {
 		VALUES ($1, $2)
 	`, userID, propertyID)
 	if err != nil {
-		// Unique violation on (user_id, property_id) means already in favorites.
+		// Нарушение unique по (user_id, property_id) значит, что уже есть в избранном.
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return ErrFavoriteExists
@@ -38,9 +38,9 @@ func (db *DB) AddFavorite(ctx context.Context, userID, propertyID int) error {
 	return nil
 }
 
-// RemoveFavorite removes property from user's favorites.
+// Удаляем объявление из избранного пользователя.
 func (db *DB) RemoveFavorite(ctx context.Context, userID, propertyID int) error {
-	// Check that property exists first to be able to return 404.
+	// Сначала проверяем, что объявление существует, чтобы корректно вернуть 404.
 	var exists bool
 	if err := db.Pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM properties WHERE id = $1)`, propertyID).Scan(&exists); err != nil {
 		return err
@@ -54,7 +54,7 @@ func (db *DB) RemoveFavorite(ctx context.Context, userID, propertyID int) error 
 	return err
 }
 
-// ListFavorites returns properties favorited by the given user.
+// Возвращаем объявления, добавленные пользователем в избранное.
 func (db *DB) ListFavorites(ctx context.Context, userID int) ([]models.Property, error) {
 	rows, err := db.Pool.Query(ctx, `
 		SELECT
@@ -82,7 +82,7 @@ func (db *DB) ListFavorites(ctx context.Context, userID int) ([]models.Property,
 	}
 	defer rows.Close()
 
-	result := []models.Property{} // Возвращаем [] вместо null
+	result := []models.Property{} // Возвращаем [] вместо null, чтобы фронту было проще.
 	for rows.Next() {
 		var p models.Property
 		var photos []string

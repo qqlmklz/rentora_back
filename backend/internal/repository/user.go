@@ -10,11 +10,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// ErrDuplicateEmail is returned when insert violates unique constraint on email.
+// Ошибка, когда insert нарушает unique-ограничение по email.
 var ErrDuplicateEmail = errors.New("duplicate email")
 
-// CreateUser inserts a user. Timestamps are set by the database.
-// Returns ErrDuplicateEmail if email already exists.
+// Создаем пользователя. Временные поля выставляет сама БД.
+// Если email уже есть, вернем ErrDuplicateEmail.
 func (db *DB) CreateUser(ctx context.Context, u *models.User) error {
 	err := db.Pool.QueryRow(ctx, `
 		INSERT INTO users (name, email, phone, password_hash, avatar)
@@ -33,7 +33,7 @@ func (db *DB) CreateUser(ctx context.Context, u *models.User) error {
 	return nil
 }
 
-// GetUserByEmail returns a user by email or nil if not found.
+// Ищем пользователя по email; если не нашли, возвращаем nil.
 func (db *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	var u models.User
 	err := db.Pool.QueryRow(ctx, `
@@ -51,7 +51,7 @@ func (db *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, e
 	return &u, nil
 }
 
-// GetUserByID returns a user by id or nil if not found.
+// Ищем пользователя по id; если не нашли, возвращаем nil.
 func (db *DB) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	var u models.User
 	err := db.Pool.QueryRow(ctx, `
@@ -69,8 +69,8 @@ func (db *DB) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	return &u, nil
 }
 
-// UpdateProfile updates name, email, phone and updated_at for a user.
-// Returns ErrDuplicateEmail if new email is taken by another user.
+// Обновляем name, email, phone и updated_at у пользователя.
+// Если новый email занят другим пользователем, вернем ErrDuplicateEmail.
 func (db *DB) UpdateProfile(ctx context.Context, id int, name, email string, phone *string) error {
 	_, err := db.Pool.Exec(ctx, `
 		UPDATE users SET name = $1, email = $2, phone = $3, updated_at = NOW() WHERE id = $4
@@ -85,19 +85,19 @@ func (db *DB) UpdateProfile(ctx context.Context, id int, name, email string, pho
 	return nil
 }
 
-// UpdateAvatar sets avatar path for user.
+// Обновляем путь к аватару пользователя.
 func (db *DB) UpdateAvatar(ctx context.Context, id int, avatarPath *string) error {
 	_, err := db.Pool.Exec(ctx, `UPDATE users SET avatar = $1, updated_at = NOW() WHERE id = $2`, avatarPath, id)
 	return err
 }
 
-// UpdatePassword sets password_hash for user.
+// Обновляем password_hash пользователя.
 func (db *DB) UpdatePassword(ctx context.Context, id int, passwordHash string) error {
 	_, err := db.Pool.Exec(ctx, `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`, passwordHash, id)
 	return err
 }
 
-// GetUserByEmailExcludingID returns a user by email with id != excludeID (for conflict check).
+// Ищем пользователя по email, исключая id = excludeID (нужно для проверки конфликта).
 func (db *DB) GetUserByEmailExcludingID(ctx context.Context, email string, excludeID int) (*models.User, error) {
 	var u models.User
 	err := db.Pool.QueryRow(ctx, `

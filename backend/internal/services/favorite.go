@@ -7,34 +7,34 @@ import (
 	"rentora/backend/internal/repository"
 )
 
-// FavoritesService handles user favorites.
+// Сервис для работы с избранным пользователя.
 type FavoritesService struct {
 	repo *repository.DB
 }
 
-// NewFavoritesService creates FavoritesService.
+// Конструктор FavoritesService.
 func NewFavoritesService(repo *repository.DB) *FavoritesService {
 	return &FavoritesService{repo: repo}
 }
 
-// Aliases to repository errors for handlers.
+// Просто алиасы ошибок из repository, чтобы удобно было в handlers.
 var (
 	ErrFavoriteExists    = repository.ErrFavoriteExists
 	ErrPropertyNotFound  = repository.ErrPropertyNotFound
 	ErrPropertyForbidden = repository.ErrPropertyForbidden
 )
 
-// List returns user's favorite properties.
+// Возвращаем список избранных объявлений пользователя.
 func (s *FavoritesService) List(ctx context.Context, userID int) ([]models.Property, error) {
 	return s.repo.ListFavorites(ctx, userID)
 }
 
-// Add adds property to user's favorites.
+// Добавляем объявление в избранное пользователя.
 func (s *FavoritesService) Add(ctx context.Context, userID, propertyID int) error {
 	return s.repo.AddFavorite(ctx, userID, propertyID)
 }
 
-// Remove removes property from user's favorites.
+// Удаляем объявление из избранного пользователя.
 func (s *FavoritesService) Remove(ctx context.Context, userID, propertyID int) error {
 	return s.repo.RemoveFavorite(ctx, userID, propertyID)
 }

@@ -14,12 +14,12 @@ import (
 
 const avatarURLPrefix = "/uploads/"
 
-// ErrPropertyNotFound is returned when a property does not exist.
+// Ошибка, когда объявление не найдено.
 var ErrPropertyNotFound = errors.New("property not found")
 
-// ErrPropertyForbidden is returned when the user is not the owner of the property.
+// Ошибка, когда пользователь не владелец объявления.
 var ErrPropertyForbidden = errors.New("property forbidden")
-// PropertyFilters describes catalog filters.
+// Фильтры для каталога.
 type PropertyFilters struct {
 	Category     string
 	PropertyType string
@@ -29,13 +29,13 @@ type PropertyFilters struct {
 	Location     string
 	Sort         string
 }
-// ListProperties returns properties for catalog using filters and sort.
+// Возвращаем объявления для каталога с фильтрами и сортировкой.
 func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.Property, error) {
 	var (
 		args    []interface{}
 		clauses []string
 	)
-	// Basic filters.
+	// Базовые фильтры.
 	if f.Category != "" {
 		args = append(args, f.Category)
 		clauses = append(clauses, fmt.Sprintf("category = $%d", len(args)))
@@ -57,7 +57,7 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 		clauses = append(clauses, fmt.Sprintf("price <= $%d", len(args)))
 	}
 	if f.Location != "" {
-		// пока матчим по адресу, при необходимости добавим city/district
+		// Пока фильтруем по адресу; при необходимости добавим city/district.
 		args = append(args, "%"+f.Location+"%")
 		clauses = append(clauses, fmt.Sprintf("address ILIKE $%d", len(args)))
 	}
@@ -82,13 +82,13 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 	if len(clauses) > 0 {
 		query += " WHERE " + strings.Join(clauses, " AND ")
 	}
-	// Sorting.
+	// Сортировка.
 	switch f.Sort {
 	case "price_asc":
 		query += " ORDER BY price ASC"
 	case "price_desc":
 		query += " ORDER BY price DESC"
-	default: // newest
+	default: // по умолчанию самые новые
 		query += " ORDER BY created_at DESC"
 	}
 	rows, err := db.Pool.Query(ctx, query, args...)
@@ -96,7 +96,7 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 		return nil, err
 	}
 	defer rows.Close()
-	props := []models.Property{} // Инициализируем пустой slice, чтобы возвращать [] вместо null
+	props := []models.Property{} // Инициализируем пустой slice, чтобы в JSON приходил [] вместо null.
 	for rows.Next() {
 		var p models.Property
 		var photos []string
@@ -125,7 +125,7 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 	return props, nil
 }
 
-// GetPropertyByID returns one property for the detail page (category always; apartmentNumber set in DB, handler may strip for non-owners).
+// Возвращаем одно объявление для страницы деталей (category всегда есть; apartmentNumber может скрыть handler для не-владельца).
 func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDetail, error) {
 	row := db.Pool.QueryRow(ctx, `
 		SELECT

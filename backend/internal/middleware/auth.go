@@ -11,7 +11,7 @@ import (
 
 const userIDKey = "user_id"
 
-// Auth validates JWT and sets user_id in context. Returns 401 if missing or invalid.
+// Проверяем JWT и кладем user_id в контекст. Если токен отсутствует или битый — 401.
 func Auth(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -34,7 +34,7 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 	}
 }
 
-// GetUserID returns the user ID set by Auth middleware. Must be used after Auth.
+// Достаем user ID, который положил Auth middleware. Использовать после Auth.
 func GetUserID(c *gin.Context) (int, bool) {
 	id, ok := c.Get(userIDKey)
 	if !ok {
@@ -44,8 +44,8 @@ func GetUserID(c *gin.Context) (int, bool) {
 	return uid, ok
 }
 
-// ParseUserIDFromBearer parses Authorization: Bearer <jwt> without failing the request.
-// Returns (0, false) if missing or invalid.
+// Пытаемся распарсить Authorization: Bearer <jwt>, не заваливая весь запрос.
+// Если заголовка нет или токен невалидный, вернем (0, false).
 func ParseUserIDFromBearer(c *gin.Context, jwtSecret string) (int, bool) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {

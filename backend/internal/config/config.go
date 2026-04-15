@@ -8,7 +8,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Config holds application configuration loaded from environment.
+// Тут держим конфиг приложения, который читаем из переменных окружения.
 type Config struct {
 	Port        int
 	GinMode     string
@@ -17,7 +17,7 @@ type Config struct {
 	JWTSecret   string
 }
 
-// Load reads .env and populates Config.
+// Тут грузим .env и собираем Config, чтобы потом не дергать os.Getenv по всему проекту.
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 

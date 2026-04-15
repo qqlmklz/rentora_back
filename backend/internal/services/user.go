@@ -1,4 +1,4 @@
 package services
 
-// UserService handles user CRUD and profile.
-// type UserService struct { ... }
+// Сервис для CRUD по пользователям и операций профиля.
+// Пример: type UserService struct { ... }

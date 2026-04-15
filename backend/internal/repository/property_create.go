@@ -8,12 +8,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// CreateProperty is kept for backwards compatibility; new code should use CreatePropertyWithImages.
+// Старый метод оставили для обратной совместимости; в новом коде лучше использовать CreatePropertyWithImages.
 func (db *DB) CreateProperty(ctx context.Context, userID int, in models.CreatePropertyInput) (int, error) {
 	return db.CreatePropertyWithImages(ctx, userID, in, nil)
 }
 
-// CreatePropertyWithImages creates property and images in a single transaction.
+// В одной транзакции создаем объявление и сохраняем его фото.
 func (db *DB) CreatePropertyWithImages(ctx context.Context, userID int, in models.CreatePropertyInput, urls []string) (int, error) {
 	tx, err := db.Pool.Begin(ctx)
 	if err != nil {
@@ -78,7 +78,7 @@ func (db *DB) CreatePropertyWithImages(ctx context.Context, userID int, in model
 		in.ApartmentNumber,
 		in.Rooms,
 		in.TotalArea,
-		in.TotalArea, // area = total_area для совместимости со старой схемой
+		in.TotalArea, // Для совместимости со старой схемой пишем area = total_area.
 		in.LivingArea,
 		in.KitchenArea,
 		in.Floor,
@@ -101,7 +101,7 @@ func (db *DB) CreatePropertyWithImages(ctx context.Context, userID int, in model
 				return 0, err
 			}
 		}
-		br.Close() // Закрываем batch ДО коммита
+		br.Close() // Пакет закрываем до commit, чтобы не оставить висящие ресурсы.
 	}
 
 	if err := tx.Commit(ctx); err != nil {

@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-// ListPropertyImageURLs returns all image_url values for a property (order by id).
+// Возвращаем все image_url для объявления (сортировка по id).
 func (db *DB) ListPropertyImageURLs(ctx context.Context, propertyID int) ([]string, error) {
 	rows, err := db.Pool.Query(ctx, `
 		SELECT image_url FROM property_images WHERE property_id = $1 ORDER BY id ASC

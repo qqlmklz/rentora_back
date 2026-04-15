@@ -1,6 +1,6 @@
 package models
 
-// CreatePropertyInput is validated input for creating a property.
+// Валидированный вход для создания объявления.
 type CreatePropertyInput struct {
 	RentType        string
 	Category        string
@@ -28,7 +28,7 @@ type CreatePropertyInput struct {
 	HousingType     *string
 }
 
-// PropertyCreateResponse is returned after successful creation.
+// Ответ после успешного создания объявления.
 type PropertyCreateResponse struct {
 	ID       int      `json:"id"`
 	Title    string   `json:"title"`

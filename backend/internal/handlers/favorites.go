@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetFavorites returns all favorite properties for current user.
+// Возвращаем все избранные объявления текущего пользователя.
 func GetFavorites(favService *services.FavoritesService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -31,7 +31,7 @@ func GetFavorites(favService *services.FavoritesService) gin.HandlerFunc {
 	}
 }
 
-// AddFavorite adds property to user's favorites.
+// Добавляем объявление в избранное пользователя.
 func AddFavorite(favService *services.FavoritesService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -61,7 +61,7 @@ func AddFavorite(favService *services.FavoritesService) gin.HandlerFunc {
 	}
 }
 
-// RemoveFavorite removes property from user's favorites.
+// Удаляем объявление из избранного пользователя.
 func RemoveFavorite(favService *services.FavoritesService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
