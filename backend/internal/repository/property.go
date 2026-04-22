@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 
 	"rentora/backend/internal/models"
@@ -23,9 +24,10 @@ var ErrPropertyForbidden = errors.New("property forbidden")
 type PropertyFilters struct {
 	Category     string
 	PropertyType string
-	Rooms        int
-	PriceFrom    int
-	PriceTo      int
+	RoomsExact   *int
+	RoomsMin     *int
+	PriceFrom    *int
+	PriceTo      *int
 	Location     string
 	Sort         string
 }
@@ -44,22 +46,27 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 		args = append(args, f.PropertyType)
 		clauses = append(clauses, fmt.Sprintf("property_type = $%d", len(args)))
 	}
-	if f.Rooms > 0 {
-		args = append(args, f.Rooms)
+	if f.RoomsExact != nil {
+		args = append(args, *f.RoomsExact)
 		clauses = append(clauses, fmt.Sprintf("rooms = $%d", len(args)))
 	}
-	if f.PriceFrom > 0 {
-		args = append(args, f.PriceFrom)
+	if f.RoomsMin != nil {
+		args = append(args, *f.RoomsMin)
+		clauses = append(clauses, fmt.Sprintf("rooms >= $%d", len(args)))
+	}
+	if f.PriceFrom != nil {
+		args = append(args, *f.PriceFrom)
 		clauses = append(clauses, fmt.Sprintf("price >= $%d", len(args)))
 	}
-	if f.PriceTo > 0 {
-		args = append(args, f.PriceTo)
+	if f.PriceTo != nil {
+		args = append(args, *f.PriceTo)
 		clauses = append(clauses, fmt.Sprintf("price <= $%d", len(args)))
 	}
 	if f.Location != "" {
-		// Пока фильтруем по адресу; при необходимости добавим city/district.
+		// Ищем по нескольким полям, чтобы строка локации работала ожидаемо.
 		args = append(args, "%"+f.Location+"%")
-		clauses = append(clauses, fmt.Sprintf("address ILIKE $%d", len(args)))
+		n := len(args)
+		clauses = append(clauses, fmt.Sprintf("(city ILIKE $%d OR district ILIKE $%d OR COALESCE(metro,'') ILIKE $%d OR address ILIKE $%d)", n, n, n, n))
 	}
 	query := `
 		SELECT
@@ -91,6 +98,8 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 	default: // по умолчанию самые новые
 		query += " ORDER BY created_at DESC"
 	}
+	log.Printf("[properties] catalog repo filters=%+v clauses=%v args=%v", f, clauses, args)
+	log.Printf("[properties] catalog repo sql=%s", strings.Join(strings.Fields(query), " "))
 	rows, err := db.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err

@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"rentora/backend/internal/config"
 	"rentora/backend/internal/repository"
 	"rentora/backend/internal/routes"
 	"rentora/backend/internal/services"
+	aiSvc "rentora/backend/internal/services/ai"
 	"rentora/backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +28,10 @@ func main() {
 	if cfg.JWTSecret == "" {
 		log.Fatal("JWT_SECRET is required")
 	}
+	analyzerMode := strings.ToLower(strings.TrimSpace(os.Getenv("PRIORITY_ANALYZER_MODE")))
+	if analyzerMode == "" {
+		analyzerMode = "ai"
+	}
 
 	ctx := context.Background()
 	db, err := repository.NewDB(ctx, cfg.DatabaseURL)
@@ -33,9 +40,28 @@ func main() {
 	}
 	defer db.Close()
 
+	db.LogApplicationsSnapshot(ctx)
+
 	authService := services.NewAuthService(db, cfg.JWTSecret)
 	profileService := services.NewProfileService(db)
 	propertyService := services.NewPropertyService(db)
+	var priorityAnalyzer aiSvc.PriorityAnalyzer
+	switch analyzerMode {
+	case "ai":
+		aiAnalyzer, err := aiSvc.NewOpenAIPriorityAnalyzerFromEnv()
+		if err != nil {
+			log.Printf("AI priority analyzer mode=ai init_error=%v -> fallback=mock", err)
+			priorityAnalyzer = aiSvc.NewMockPriorityAnalyzer()
+			analyzerMode = "mock"
+		} else {
+			priorityAnalyzer = aiAnalyzer
+		}
+	default:
+		priorityAnalyzer = aiSvc.NewMockPriorityAnalyzer()
+		analyzerMode = "mock"
+	}
+	log.Printf("AI priority analyzer mode=%s", analyzerMode)
+	applicationService := services.NewApplicationService(db, priorityAnalyzer)
 	favoritesService := services.NewFavoritesService(db)
 	hub := ws.NewHub()
 	chatService := services.NewChatService(db, hub)
@@ -44,7 +70,7 @@ func main() {
 	gin.SetMode(cfg.GinMode)
 	r := gin.New()
 
-	routes.Setup(r, cfg.CORSOrigins, authService, profileService, propertyService, favoritesService, chatService, contractService, hub, cfg.JWTSecret)
+	routes.Setup(r, cfg.CORSOrigins, authService, profileService, propertyService, applicationService, favoritesService, chatService, contractService, hub, cfg.JWTSecret)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("Rentora backend starting on %s", addr)

@@ -237,6 +237,7 @@ func (s *ContractService) AcceptContract(ctx context.Context, userID, contractID
 	if err != nil {
 		return err
 	}
+	log.Printf("[contracts] accept: contractId=%d tenantId=%d currentUserId=%d currentStatus=%s propertyId=%d", contractID, row.TenantID, userID, row.Status, row.PropertyID)
 	if userID != row.TenantID {
 		return repository.ErrContractForbidden
 	}
@@ -247,6 +248,7 @@ func (s *ContractService) AcceptContract(ctx context.Context, userID, contractID
 	if err != nil {
 		return err
 	}
+	log.Printf("[contracts] accept: contractId=%d newStatus=%s propertyId=%d", contractID, repository.ContractStatusAccepted, row.PropertyID)
 	s.broadcastMessage(ctx, row.ChatID, m)
 	return nil
 }

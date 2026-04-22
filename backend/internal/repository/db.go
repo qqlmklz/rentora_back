@@ -69,6 +69,168 @@ func (db *DB) migrate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	_, err = db.Pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS applications (
+			id          SERIAL PRIMARY KEY,
+			user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			property_id INT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+			title       TEXT NOT NULL DEFAULT '',
+			category    TEXT NOT NULL DEFAULT '',
+			status      TEXT NOT NULL DEFAULT 'pending',
+			description TEXT NOT NULL DEFAULT '',
+			priority    TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
+			priority_status TEXT NOT NULL DEFAULT 'pending' CHECK (priority_status IN ('pending', 'ready', 'fallback')),
+			priority_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+			priority_reason TEXT NOT NULL DEFAULT '',
+			resolution_type TEXT CHECK (resolution_type IN ('owner', 'tenant')),
+			request_photos JSONB NOT NULL DEFAULT '[]'::jsonb,
+			expense_amount DOUBLE PRECISION,
+			expense_comment TEXT,
+			expense_photos JSONB NOT NULL DEFAULT '[]'::jsonb,
+			tenant_expenses_confirmed_at TIMESTAMP,
+			created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+			updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_applications_property_id ON applications(property_id)`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'medium'`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS priority_status TEXT NOT NULL DEFAULT 'pending'`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT ''`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT ''`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS priority_score DOUBLE PRECISION NOT NULL DEFAULT 0`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS priority_reason TEXT NOT NULL DEFAULT ''`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS resolution_type TEXT`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS request_photos JSONB NOT NULL DEFAULT '[]'::jsonb`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS expense_amount DOUBLE PRECISION`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS expense_comment TEXT`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS expense_photos JSONB NOT NULL DEFAULT '[]'::jsonb`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS tenant_expenses_confirmed_at TIMESTAMP`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT false`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET is_archived = true WHERE status IN ('completed', 'resolved')`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET status = 'pending' WHERE status IS NULL OR TRIM(status) = ''`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET priority = 'medium' WHERE priority IS NULL OR TRIM(priority) = ''`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET priority_status = 'pending' WHERE priority_status IS NULL OR TRIM(priority_status) = ''`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET title = 'Без названия' WHERE TRIM(title) = ''`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET category = 'other' WHERE TRIM(category) = ''`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET priority_reason = '' WHERE priority_reason IS NULL`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET request_photos = '[]'::jsonb WHERE request_photos IS NULL`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET expense_photos = '[]'::jsonb WHERE expense_photos IS NULL`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ALTER COLUMN priority_score SET DEFAULT 0`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ALTER COLUMN priority_reason SET DEFAULT ''`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ALTER COLUMN request_photos SET DEFAULT '[]'::jsonb`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ALTER COLUMN expense_photos SET DEFAULT '[]'::jsonb`)
+	if err != nil {
+		return err
+	}
+	_, _ = db.Pool.Exec(ctx, `ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_resolution_type_check`)
+	_, err = db.Pool.Exec(ctx, `
+		ALTER TABLE applications ADD CONSTRAINT applications_resolution_type_check
+		CHECK (resolution_type IS NULL OR resolution_type IN ('owner', 'tenant'))
+	`)
+	if err != nil {
+		return err
+	}
+	_, _ = db.Pool.Exec(ctx, `ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_priority_check`)
+	_, err = db.Pool.Exec(ctx, `
+		ALTER TABLE applications ADD CONSTRAINT applications_priority_check
+		CHECK (priority IN ('low', 'medium', 'high'))
+	`)
+	if err != nil {
+		return err
+	}
+	_, _ = db.Pool.Exec(ctx, `ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_priority_status_check`)
+	_, err = db.Pool.Exec(ctx, `
+		ALTER TABLE applications ADD CONSTRAINT applications_priority_status_check
+		CHECK (priority_status IN ('pending', 'ready', 'fallback'))
+	`)
+	if err != nil {
+		return err
+	}
 
 	_, err = db.Pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS properties (

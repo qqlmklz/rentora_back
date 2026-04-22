@@ -1,7 +1,6 @@
 package models
 
-// Базовая модель объявления для каталога и избранного.
-// Здесь только поля карточки; если нужно, для страницы деталей можно расширить.
+// Property — снимок карточки объявления (каталог, избранное, вложение в GET /api/profile/requests как поле "property").
 type Property struct {
 	ID           int      `json:"id"`
 	Title        string   `json:"title"`

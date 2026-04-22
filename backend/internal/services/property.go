@@ -32,19 +32,23 @@ var (
 type CatalogFilters struct {
 	Category     string
 	PropertyType string
-	Rooms        int
-	PriceFrom    int
-	PriceTo      int
+	RoomsExact   *int
+	RoomsMin     *int
+	PriceFrom    *int
+	PriceTo      *int
 	Location     string
 	Sort         string
 }
 
 // Возвращаем объявления для /catalog с примененными фильтрами и сортировкой.
 func (s *PropertyService) ListForCatalog(ctx context.Context, f CatalogFilters) ([]models.Property, error) {
+	log.Printf("[properties] catalog service filters: category=%q propertyType=%q roomsExact=%v roomsMin=%v priceFrom=%v priceTo=%v location=%q sort=%q",
+		f.Category, f.PropertyType, f.RoomsExact, f.RoomsMin, f.PriceFrom, f.PriceTo, f.Location, f.Sort)
 	return s.repo.ListProperties(ctx, repository.PropertyFilters{
 		Category:     f.Category,
 		PropertyType: f.PropertyType,
-		Rooms:        f.Rooms,
+		RoomsExact:   f.RoomsExact,
+		RoomsMin:     f.RoomsMin,
 		PriceFrom:    f.PriceFrom,
 		PriceTo:      f.PriceTo,
 		Location:     f.Location,

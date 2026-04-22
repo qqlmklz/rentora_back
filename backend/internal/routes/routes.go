@@ -10,7 +10,7 @@ import (
 )
 
 // Тут настраиваем все роуты и middleware на переданном движке.
-func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthService, profileService *services.ProfileService, propertyService *services.PropertyService, favoritesService *services.FavoritesService, chatService *services.ChatService, contractService *services.ContractService, hub *ws.Hub, jwtSecret string) {
+func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthService, profileService *services.ProfileService, propertyService *services.PropertyService, applicationService *services.ApplicationService, favoritesService *services.FavoritesService, chatService *services.ChatService, contractService *services.ContractService, hub *ws.Hub, jwtSecret string) {
 	r.Use(middleware.RecoveryJSON())
 	r.Use(middleware.Logging())
 	r.Use(middleware.CORS(corsOrigins))
@@ -26,7 +26,7 @@ func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthServic
 		authRoutes(auth, authService, jwtSecret)
 
 		profile := api.Group("/profile")
-		profileRoutes(profile, profileService, propertyService, contractService, jwtSecret)
+		profileRoutes(profile, profileService, propertyService, contractService, applicationService, jwtSecret)
 
 		users := api.Group("/users")
 		userRoutes(users)
@@ -34,8 +34,8 @@ func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthServic
 		properties := api.Group("/properties")
 		propertyRoutes(properties, propertyService, jwtSecret)
 
-		applications := api.Group("/applications")
-		applicationRoutes(applications)
+		requests := api.Group("/requests")
+		requestRoutes(requests, applicationService, jwtSecret)
 
 		favorites := api.Group("/favorites")
 		favoriteRoutes(favorites, favoritesService, jwtSecret)
@@ -58,7 +58,7 @@ func authRoutes(g *gin.RouterGroup, authService *services.AuthService, jwtSecret
 	g.GET("/me", middleware.Auth(jwtSecret), handlers.Me(authService))
 }
 
-func profileRoutes(g *gin.RouterGroup, profileService *services.ProfileService, propertyService *services.PropertyService, contractService *services.ContractService, jwtSecret string) {
+func profileRoutes(g *gin.RouterGroup, profileService *services.ProfileService, propertyService *services.PropertyService, contractService *services.ContractService, applicationService *services.ApplicationService, jwtSecret string) {
 	g.Use(middleware.Auth(jwtSecret))
 	g.GET("", handlers.GetProfile(profileService))
 	g.PATCH("", handlers.UpdateProfile(profileService))
@@ -67,6 +67,7 @@ func profileRoutes(g *gin.RouterGroup, profileService *services.ProfileService, 
 	g.PATCH("/password", handlers.UpdatePassword(profileService))
 	g.GET("/properties", handlers.GetMyProperties(propertyService))
 	g.GET("/documents", handlers.GetProfileDocuments(contractService))
+	g.GET("/requests", handlers.GetProfileRequests(applicationService))
 }
 
 func userRoutes(g *gin.RouterGroup) {
@@ -85,8 +86,15 @@ func propertyRoutes(g *gin.RouterGroup, propertyService *services.PropertyServic
 	g.PATCH("/:id", middleware.Auth(jwtSecret), handlers.UpdateProperty(propertyService))
 }
 
-func applicationRoutes(g *gin.RouterGroup) {
-	// Здесь будут маршруты заявок (GET/POST /api/applications и т.д.).
+func requestRoutes(g *gin.RouterGroup, applicationService *services.ApplicationService, jwtSecret string) {
+	g.Use(middleware.Auth(jwtSecret))
+	g.GET("/available-properties", handlers.GetAvailableRequestProperties(applicationService))
+	g.POST("", handlers.CreateRequest(applicationService))
+	g.PATCH("/:id/decision", handlers.DecideRequest(applicationService))
+	g.PATCH("/:id/expense", handlers.SubmitRequestExpense(applicationService))
+	g.POST("/:id/confirm-tenant-expenses", handlers.ConfirmTenantExpenses(applicationService))
+	g.POST("/:id/complete-owner", handlers.CompleteOwnerResolution(applicationService))
+	g.POST("/:id/complete-owner-request", handlers.CompleteOwnerRequest(applicationService))
 }
 
 func favoriteRoutes(g *gin.RouterGroup, favService *services.FavoritesService, jwtSecret string) {

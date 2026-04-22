@@ -31,37 +31,136 @@ const (
 // Обработчик GET /api/properties для каталога.
 func GetProperties(propertyService *services.PropertyService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		categoryRaw := strings.TrimSpace(c.Query("category"))
+		propertyTypeRaw := strings.TrimSpace(c.Query("propertyType"))
+		roomsRaw := strings.TrimSpace(c.Query("rooms"))
+		priceFromRaw := strings.TrimSpace(c.Query("priceFrom"))
+		priceToRaw := strings.TrimSpace(c.Query("priceTo"))
+		location := strings.TrimSpace(c.Query("location"))
+		sortRaw := strings.TrimSpace(c.DefaultQuery("sort", "newest"))
+		sortValue := strings.ToLower(sortRaw)
+		category := normalizeCategoryCatalogFilter(categoryRaw)
+		propertyType := normalizePropertyTypeCatalogFilter(propertyTypeRaw)
+
+		log.Printf("[properties] catalog incoming query: raw=%q category=%q propertyType=%q rooms=%q priceFrom=%q priceTo=%q location=%q sort=%q",
+			c.Request.URL.RawQuery, categoryRaw, propertyTypeRaw, roomsRaw, priceFromRaw, priceToRaw, location, sortRaw)
+
 		filters := services.CatalogFilters{
-			Category:     c.Query("category"),
-			PropertyType: c.Query("propertyType"),
-			Location:     c.Query("location"),
-			Sort:         c.DefaultQuery("sort", "newest"),
+			Category:     category,
+			PropertyType: propertyType,
+			Location:     location,
+			Sort:         sortValue,
 		}
 
-		if roomsStr := c.Query("rooms"); roomsStr != "" {
-			if v, err := strconv.Atoi(roomsStr); err == nil {
-				filters.Rooms = v
+		if roomsRaw != "" {
+			switch roomsRaw {
+			case "studio":
+				v := 0
+				filters.RoomsExact = &v
+			case "6+":
+				v := 6
+				filters.RoomsMin = &v
+			default:
+				v, err := strconv.Atoi(roomsRaw)
+				if err != nil || v < 0 {
+					utils.JSONErrorBadRequest(c, "Некорректный параметр rooms")
+					return
+				}
+				filters.RoomsExact = &v
 			}
 		}
-		if priceFromStr := c.Query("priceFrom"); priceFromStr != "" {
-			if v, err := strconv.Atoi(priceFromStr); err == nil {
-				filters.PriceFrom = v
+		if priceFromRaw != "" {
+			v, err := strconv.Atoi(priceFromRaw)
+			if err != nil || v < 0 {
+				utils.JSONErrorBadRequest(c, "Некорректный параметр priceFrom")
+				return
 			}
+			filters.PriceFrom = &v
 		}
-		if priceToStr := c.Query("priceTo"); priceToStr != "" {
-			if v, err := strconv.Atoi(priceToStr); err == nil {
-				filters.PriceTo = v
+		if priceToRaw != "" {
+			v, err := strconv.Atoi(priceToRaw)
+			if err != nil || v < 0 {
+				utils.JSONErrorBadRequest(c, "Некорректный параметр priceTo")
+				return
 			}
+			filters.PriceTo = &v
+		}
+		if filters.PriceFrom != nil && filters.PriceTo != nil && *filters.PriceFrom > *filters.PriceTo {
+			utils.JSONErrorBadRequest(c, "priceFrom не может быть больше priceTo")
+			return
+		}
+		switch sortValue {
+		case "newest", "price_asc", "price_desc":
+			// ok
+		default:
+			utils.JSONErrorBadRequest(c, "Некорректный параметр sort")
+			return
+		}
+		if filters.Category != "" && filters.PropertyType != "" && !isCatalogPropertyTypeAllowed(filters.Category, filters.PropertyType) {
+			log.Printf("[properties] catalog category/propertyType mismatch: category=%q propertyType=%q action=ignore_propertyType", filters.Category, filters.PropertyType)
+			filters.PropertyType = ""
 		}
 
+		log.Printf("[properties] catalog normalized filters: rawCategory=%q rawPropertyType=%q category=%q propertyType=%q roomsExact=%v roomsMin=%v priceFrom=%v priceTo=%v location=%q sort=%q",
+			categoryRaw, propertyTypeRaw, filters.Category, filters.PropertyType, filters.RoomsExact, filters.RoomsMin, filters.PriceFrom, filters.PriceTo, filters.Location, filters.Sort)
 		props, err := propertyService.ListForCatalog(c.Request.Context(), filters)
 		if err != nil {
-			// Для каталога пока отдаем общий 500; если нужно, потом добавим отдельное логирование.
+			log.Printf("[properties] catalog error: %v", err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Ошибка загрузки объявлений"})
 			return
 		}
 		c.JSON(http.StatusOK, props)
 	}
+}
+
+func normalizeCategoryCatalogFilter(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "residential", "жилая":
+		return "жилая"
+	case "commercial", "коммерческая":
+		return "коммерческая"
+	default:
+		return strings.TrimSpace(v)
+	}
+}
+
+func normalizePropertyTypeCatalogFilter(v string) string {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "apartment", "квартира":
+		return "квартира"
+	case "room", "комната":
+		return "комната"
+	case "house", "дом/дача":
+		return "дом/дача"
+	case "cottage", "коттедж":
+		return "коттедж"
+	case "office", "офис":
+		return "офис"
+	case "coworking", "коворкинг":
+		return "коворкинг"
+	case "building", "здание":
+		return "здание"
+	case "warehouse", "склад":
+		return "склад"
+	default:
+		return strings.TrimSpace(v)
+	}
+}
+
+func isCatalogPropertyTypeAllowed(category, propertyType string) bool {
+	switch category {
+	case "жилая":
+		switch propertyType {
+		case "квартира", "комната", "дом/дача", "коттедж":
+			return true
+		}
+	case "коммерческая":
+		switch propertyType {
+		case "офис", "коворкинг", "здание", "склад":
+			return true
+		}
+	}
+	return false
 }
 
 // Обработчик GET /api/properties/:id (публичный). С Bearer JWT владелец видит apartmentNumber.
