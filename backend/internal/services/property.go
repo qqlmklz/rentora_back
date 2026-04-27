@@ -38,6 +38,7 @@ type CatalogFilters struct {
 	PriceTo      *int
 	Location     string
 	Sort         string
+	CurrentUserID *int
 }
 
 // Возвращаем объявления для /catalog с примененными фильтрами и сортировкой.
@@ -53,6 +54,7 @@ func (s *PropertyService) ListForCatalog(ctx context.Context, f CatalogFilters) 
 		PriceTo:      f.PriceTo,
 		Location:     f.Location,
 		Sort:         f.Sort,
+		CurrentUserID: f.CurrentUserID,
 	})
 }
 

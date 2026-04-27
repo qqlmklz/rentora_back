@@ -59,6 +59,7 @@ type ProfileRequestItem struct {
 	ExpenseAmount    *float64  `json:"expenseAmount,omitempty"`
 	ExpenseComment   *string   `json:"expenseComment,omitempty"`
 	ExpensePhotos    []string  `json:"expensePhotos"`
+	ExpensesSubmitted bool     `json:"expenses_submitted"`
 	CreatedAt        time.Time `json:"createdAt"`
 	PropertyID       int       `json:"propertyId"`
 	PropertyTitle    string    `json:"propertyTitle"`
@@ -66,7 +67,7 @@ type ProfileRequestItem struct {
 	PropertyAddress  string    `json:"propertyAddress"`
 	PropertyCity     string    `json:"propertyCity"`
 	PropertyDistrict string    `json:"propertyDistrict"`
-	Property         Property  `json:"property"`
+	Property         *Property `json:"property,omitempty"`
 	TenantExpensesConfirmedAt *time.Time `json:"confirmedAt,omitempty"`
 	IsArchived       bool      `json:"isArchived"`
 }
@@ -85,6 +86,7 @@ type PropertyRequestItem struct {
 	ExpenseAmount    *float64  `json:"expenseAmount,omitempty"`
 	ExpenseComment   *string   `json:"expenseComment,omitempty"`
 	ExpensePhotos    []string  `json:"expensePhotos"`
+	ExpensesSubmitted bool     `json:"expenses_submitted"`
 	CreatedAt        time.Time `json:"createdAt"`
 	PropertyID       int       `json:"propertyId"`
 	PropertyTitle    string    `json:"propertyTitle"`
@@ -92,7 +94,7 @@ type PropertyRequestItem struct {
 	PropertyAddress  string    `json:"propertyAddress"`
 	PropertyCity     string    `json:"propertyCity"`
 	PropertyDistrict string    `json:"propertyDistrict"`
-	Property         Property  `json:"property"`
+	Property         *Property `json:"property,omitempty"`
 	RequesterID      int       `json:"requesterId"`
 	RequesterName    string    `json:"requesterName"`
 	PropertyOwnerID  int       `json:"propertyOwnerId"`
@@ -137,7 +139,9 @@ type CreateRequestResponse struct {
 	ExpenseAmount  *float64  `json:"expenseAmount,omitempty"`
 	ExpenseComment *string   `json:"expenseComment,omitempty"`
 	ExpensePhotos  []string  `json:"expensePhotos"`
+	ExpensesSubmitted bool   `json:"expenses_submitted"`
 	CreatedAt      time.Time `json:"createdAt"`
+	PropertyOwnerID int      `json:"propertyOwnerId"`
 }
 
 // Тело запроса для PATCH /api/requests/:id/decision.
@@ -167,6 +171,7 @@ type RequestDecisionResponse struct {
 	ExpenseAmount    *float64  `json:"expenseAmount,omitempty"`
 	ExpenseComment   *string   `json:"expenseComment,omitempty"`
 	ExpensePhotos    []string  `json:"expensePhotos"`
+	ExpensesSubmitted bool     `json:"expenses_submitted"`
 }
 
 // Ответ PATCH /api/requests/:id/expense.
@@ -182,6 +187,7 @@ type RequestExpenseResponse struct {
 	ExpenseAmount    float64   `json:"expenseAmount"`
 	ExpenseComment   string    `json:"expenseComment"`
 	ExpensePhotos    []string  `json:"expensePhotos"`
+	ExpensesSubmitted bool     `json:"expenses_submitted"`
 	CreatedAt        time.Time `json:"createdAt"`
 	PropertyID       int       `json:"propertyId"`
 	PropertyTitle    string    `json:"propertyTitle"`
@@ -191,6 +197,7 @@ type RequestExpenseResponse struct {
 	PropertyDistrict string    `json:"propertyDistrict"`
 	RequesterID      int       `json:"requesterId"`
 	RequesterName    string    `json:"requesterName"`
+	PropertyOwnerID  int       `json:"propertyOwnerId"`
 	IsArchived       bool      `json:"isArchived"`
 }
 
@@ -215,6 +222,7 @@ type ConfirmTenantExpensesResponse struct {
 	ExpenseAmount    float64    `json:"expenseAmount"`
 	ExpenseComment   string     `json:"expenseComment"`
 	ExpensePhotos    []string   `json:"expensePhotos"`
+	ExpensesSubmitted bool      `json:"expenses_submitted"`
 	ConfirmedAt      time.Time  `json:"confirmedAt"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	PropertyID       int        `json:"propertyId"`

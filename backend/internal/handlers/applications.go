@@ -32,7 +32,8 @@ type createRequestPayload struct {
 }
 
 type requestDecisionPayload struct {
-	ResolutionType string `json:"resolutionType"`
+	ResolutionType    string `json:"resolutionType"`
+	ResolutionTypeAlt string `json:"resolution_type"`
 }
 
 func parseExpenseAmount(value string) (float64, error) {
@@ -149,8 +150,10 @@ func GetProfileRequests(applicationService *services.ApplicationService) gin.Han
 		bucket := strings.ToLower(strings.TrimSpace(c.Query("bucket")))
 		resp, err := applicationService.ListProfileRequests(c.Request.Context(), userID, bucket)
 		if err != nil {
-			log.Printf("[requests] GetProfileRequests: %v", err)
-			utils.JSONErrorInternal(c, "Ошибка загрузки заявок")
+			log.Printf("PROFILE REQUESTS ERROR: %+v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("%+v", err),
+			})
 			return
 		}
 		if resp == nil {
@@ -350,13 +353,17 @@ func DecideRequest(applicationService *services.ApplicationService) gin.HandlerF
 			return
 		}
 
-		resp, err := applicationService.DecideRequest(c.Request.Context(), userID, requestID, payload.ResolutionType)
+		resolutionType := strings.TrimSpace(payload.ResolutionType)
+		if resolutionType == "" {
+			resolutionType = strings.TrimSpace(payload.ResolutionTypeAlt)
+		}
+		resp, err := applicationService.DecideRequest(c.Request.Context(), userID, requestID, resolutionType)
 		if err != nil {
 			switch {
 			case errors.Is(err, services.ErrRequestDecisionInvalidResolution):
 				utils.JSONErrorBadRequest(c, "Поле resolutionType должно быть owner или tenant")
 			case errors.Is(err, services.ErrRequestDecisionInvalidStatus):
-				utils.JSONErrorBadRequest(c, "Решение можно принять только для заявок в статусе pending или in_review")
+				utils.JSONErrorBadRequest(c, "Решение можно принять только для заявок в статусе pending")
 			case errors.Is(err, services.ErrRequestDecisionForbidden):
 				utils.JSONErrorForbidden(c, "Нет доступа к этой заявке")
 			case errors.Is(err, services.ErrRequestDecisionNotFound):
@@ -507,7 +514,7 @@ func CompleteOwnerResolution(applicationService *services.ApplicationService) gi
 			utils.JSONErrorBadRequest(c, "Некорректный id заявки")
 			return
 		}
-		resp, err := applicationService.CompleteOwnerResolution(c.Request.Context(), ownerID, requestID)
+		resp, err := applicationService.CompleteOwnerRequest(c.Request.Context(), ownerID, requestID)
 		if err != nil {
 			switch {
 			case errors.Is(err, services.ErrCompleteOwnerNotFound):

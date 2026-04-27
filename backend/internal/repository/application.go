@@ -14,12 +14,9 @@ import (
 )
 
 const ApplicationStatusPending = "pending"
-const ApplicationStatusInReview = "in_review"
 const ApplicationStatusOwnerResolves = "owner_resolves"
 const ApplicationStatusTenantResolves = "tenant_resolves"
-const ApplicationStatusWaitingExpense = "waiting_expense"
 const ApplicationStatusCompleted = "completed"
-const ApplicationStatusResolved = "resolved"
 const ApplicationPriorityPendingReason = ""
 
 var ErrRequestNotFound = errors.New("request not found")
@@ -42,6 +39,7 @@ type ApplicationRow struct {
 	ExpenseAmount    *float64
 	ExpenseComment   *string
 	ExpensePhotos    []string
+	ExpensesSubmitted bool
 	Description      string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -52,6 +50,7 @@ type ApplicationRow struct {
 	PropertyAddress  string
 	PropertyCity     string
 	PropertyDistrict string
+	PropertyOwnerID  int
 	PropertyPrice    int
 	PropertyTypeName string
 	PropertyRooms    int
@@ -74,6 +73,7 @@ type PropertyRequestRow struct {
 	ExpenseAmount    *float64
 	ExpenseComment   *string
 	ExpensePhotos    []string
+	ExpensesSubmitted bool
 	Description      string
 	CreatedAt        time.Time
 	TenantExpensesConfirmedAt sql.NullTime
@@ -114,6 +114,7 @@ type RequestDecisionRow struct {
 	ExpenseAmount    *float64
 	ExpenseComment   *string
 	ExpensePhotos    []string
+	ExpensesSubmitted bool
 	TenantExpensesConfirmedAt sql.NullTime
 }
 
@@ -147,6 +148,7 @@ func (db *DB) ListApplicationsByUser(ctx context.Context, userID int) ([]Applica
 			a.expense_amount,
 			a.expense_comment,
 			COALESCE(a.expense_photos, '[]'::jsonb),
+			a.expenses_submitted,
 			a.description,
 			a.created_at,
 			a.updated_at,
@@ -157,6 +159,7 @@ func (db *DB) ListApplicationsByUser(ctx context.Context, userID int) ([]Applica
 			p.address,
 			p.city,
 			p.district,
+			p.user_id,
 			COALESCE(p.price, 0),
 			COALESCE(p.property_type, ''),
 			COALESCE(p.rooms, 0),
@@ -205,6 +208,7 @@ func (db *DB) ListApplicationsByUser(ctx context.Context, userID int) ([]Applica
 			&expenseAmount,
 			&expenseComment,
 			&expensePhotosRaw,
+			&r.ExpensesSubmitted,
 			&r.Description,
 			&r.CreatedAt,
 			&r.UpdatedAt,
@@ -215,6 +219,7 @@ func (db *DB) ListApplicationsByUser(ctx context.Context, userID int) ([]Applica
 			&r.PropertyAddress,
 			&r.PropertyCity,
 			&r.PropertyDistrict,
+			&r.PropertyOwnerID,
 			&r.PropertyPrice,
 			&r.PropertyTypeName,
 			&r.PropertyRooms,
@@ -292,6 +297,7 @@ func (db *DB) ListApplicationsForOwnerProperties(ctx context.Context, ownerUserI
 			a.expense_amount,
 			a.expense_comment,
 			COALESCE(a.expense_photos, '[]'::jsonb),
+			a.expenses_submitted,
 			a.description,
 			a.created_at,
 			a.tenant_expenses_confirmed_at,
@@ -348,6 +354,7 @@ func (db *DB) ListApplicationsForOwnerProperties(ctx context.Context, ownerUserI
 			&expenseAmount,
 			&expenseComment,
 			&expensePhotosRaw,
+			&r.ExpensesSubmitted,
 			&r.Description,
 			&r.CreatedAt,
 			&confirmedAt,
@@ -423,6 +430,7 @@ func (db *DB) GetPropertyRequestForOwner(ctx context.Context, ownerUserID, reque
 			a.expense_amount,
 			a.expense_comment,
 			COALESCE(a.expense_photos, '[]'::jsonb),
+			a.expenses_submitted,
 			a.description,
 			a.created_at,
 			a.tenant_expenses_confirmed_at,
@@ -431,6 +439,7 @@ func (db *DB) GetPropertyRequestForOwner(ctx context.Context, ownerUserID, reque
 			p.address,
 			p.city,
 			p.district,
+			p.user_id,
 			COALESCE(p.price, 0),
 			COALESCE(p.property_type, ''),
 			COALESCE(p.rooms, 0),
@@ -462,6 +471,7 @@ func (db *DB) GetPropertyRequestForOwner(ctx context.Context, ownerUserID, reque
 		&expenseAmount,
 		&expenseComment,
 		&expensePhotosRaw,
+		&r.ExpensesSubmitted,
 		&r.Description,
 		&r.CreatedAt,
 		&confirmedAt,
@@ -524,6 +534,11 @@ func (db *DB) CreateApplication(ctx context.Context, userID, propertyID int, tit
 
 	var id int
 	var createdAt time.Time
+	var insertedResolutionType sql.NullString
+	var insertedExpenseAmount sql.NullFloat64
+	var insertedExpenseComment sql.NullString
+	var insertedExpensePhotosRaw []byte
+	var insertedExpensesSubmitted bool
 	requestPhotosJSON, err := json.Marshal(requestPhotos)
 	if err != nil {
 		return nil, err
@@ -534,8 +549,16 @@ func (db *DB) CreateApplication(ctx context.Context, userID, propertyID int, tit
 		SELECT $1, p.id, $3, $4, $5, $6, 'medium', 'pending', 0, $7, $8::jsonb
 		FROM properties p
 		WHERE p.id = $2
-		RETURNING id, created_at
-	`, userID, propertyID, title, description, category, ApplicationStatusPending, ApplicationPriorityPendingReason, string(requestPhotosJSON)).Scan(&id, &createdAt)
+		RETURNING id, created_at, resolution_type, expense_amount, expense_comment, COALESCE(expense_photos, '[]'::jsonb), expenses_submitted
+	`, userID, propertyID, title, description, category, ApplicationStatusPending, ApplicationPriorityPendingReason, string(requestPhotosJSON)).Scan(
+		&id,
+		&createdAt,
+		&insertedResolutionType,
+		&insertedExpenseAmount,
+		&insertedExpenseComment,
+		&insertedExpensePhotosRaw,
+		&insertedExpensesSubmitted,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrPropertyNotFound
 	}
@@ -569,6 +592,7 @@ func (db *DB) CreateApplication(ctx context.Context, userID, propertyID int, tit
 			a.expense_amount,
 			a.expense_comment,
 			COALESCE(a.expense_photos, '[]'::jsonb),
+			a.expenses_submitted,
 			a.description,
 			a.created_at,
 			a.updated_at,
@@ -578,6 +602,7 @@ func (db *DB) CreateApplication(ctx context.Context, userID, propertyID int, tit
 			p.address,
 			p.city,
 			p.district,
+			p.user_id,
 			COALESCE(p.price, 0),
 			COALESCE(p.property_type, ''),
 			COALESCE(p.rooms, 0),
@@ -608,6 +633,7 @@ func (db *DB) CreateApplication(ctx context.Context, userID, propertyID int, tit
 		&expenseAmount,
 		&expenseComment,
 		&expensePhotosRaw,
+		&row.ExpensesSubmitted,
 		&row.Description,
 		&row.CreatedAt,
 		&row.UpdatedAt,
@@ -617,6 +643,7 @@ func (db *DB) CreateApplication(ctx context.Context, userID, propertyID int, tit
 		&row.PropertyAddress,
 		&row.PropertyCity,
 		&row.PropertyDistrict,
+		&row.PropertyOwnerID,
 		&row.PropertyPrice,
 		&row.PropertyTypeName,
 		&row.PropertyRooms,
@@ -626,6 +653,22 @@ func (db *DB) CreateApplication(ctx context.Context, userID, propertyID int, tit
 	if err != nil {
 		return nil, err
 	}
+	if insertedResolutionType.Valid {
+		s := strings.TrimSpace(insertedResolutionType.String)
+		if s != "" {
+			row.ResolutionType = &s
+		}
+	}
+	if insertedExpenseAmount.Valid {
+		v := insertedExpenseAmount.Float64
+		row.ExpenseAmount = &v
+	}
+	if insertedExpenseComment.Valid {
+		s := strings.TrimSpace(insertedExpenseComment.String)
+		row.ExpenseComment = &s
+	}
+	row.ExpensePhotos = decodeStringJSONArray(insertedExpensePhotosRaw)
+	row.ExpensesSubmitted = insertedExpensesSubmitted
 	row.TenantExpensesConfirmedAt = confirmedAtCreate
 	if photo.Valid {
 		s := strings.TrimSpace(photo.String)
@@ -690,6 +733,7 @@ func (db *DB) GetRequestDecisionInfo(ctx context.Context, requestID int) (*Reque
 			a.expense_amount,
 			a.expense_comment,
 			COALESCE(a.expense_photos, '[]'::jsonb),
+			a.expenses_submitted,
 			a.tenant_expenses_confirmed_at
 		FROM applications a
 		INNER JOIN properties p ON p.id = a.property_id
@@ -717,6 +761,7 @@ func (db *DB) GetRequestDecisionInfo(ctx context.Context, requestID int) (*Reque
 		&expenseAmount,
 		&expenseComment,
 		&expensePhotosRaw,
+		&row.ExpensesSubmitted,
 		&confirmedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -775,6 +820,7 @@ func (db *DB) ApplyRequestExpense(ctx context.Context, requestID int, expenseAmo
 		SET expense_amount = $1,
 		    expense_comment = $2,
 		    expense_photos = $3::jsonb,
+		    expenses_submitted = TRUE,
 		    status = $4,
 		    updated_at = NOW()
 		WHERE id = $5
@@ -804,8 +850,7 @@ func (db *DB) ConfirmTenantExpenses(ctx context.Context, requestID int) (*Confir
 		    updated_at = NOW()
 		WHERE id = $2
 		  AND resolution_type = 'tenant'
-		  AND expense_amount IS NOT NULL
-		  AND TRIM(COALESCE(expense_comment, '')) <> ''
+		  AND expenses_submitted = TRUE
 		  AND status = $3
 		  AND tenant_expenses_confirmed_at IS NULL
 		RETURNING id, status, is_archived
@@ -813,7 +858,7 @@ func (db *DB) ConfirmTenantExpenses(ctx context.Context, requestID int) (*Confir
 	var id int
 	var status string
 	var isArchived bool
-	err := db.Pool.QueryRow(ctx, sqlQuery, ApplicationStatusCompleted, requestID, ApplicationStatusWaitingExpense).Scan(&id, &status, &isArchived)
+	err := db.Pool.QueryRow(ctx, sqlQuery, ApplicationStatusCompleted, requestID, ApplicationStatusTenantResolves).Scan(&id, &status, &isArchived)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -823,7 +868,7 @@ func (db *DB) ConfirmTenantExpenses(ctx context.Context, requestID int) (*Confir
 	return &ConfirmTenantExpensesResult{ID: id, Status: status, IsArchived: isArchived}, nil
 }
 
-// ResolveOwnerRequest завершает сценарий «устраняет владелец»: owner_resolves → resolved.
+// ResolveOwnerRequest завершает сценарий «устраняет владелец»: owner_resolves → completed.
 func (db *DB) ResolveOwnerRequest(ctx context.Context, requestID, ownerUserID int) (bool, error) {
 	sqlQuery := `
 		UPDATE applications a
@@ -837,7 +882,7 @@ func (db *DB) ResolveOwnerRequest(ctx context.Context, requestID, ownerUserID in
 		  AND a.resolution_type = 'owner'
 		  AND a.status = $4
 	`
-	cmd, err := db.Pool.Exec(ctx, sqlQuery, ApplicationStatusResolved, requestID, ownerUserID, ApplicationStatusOwnerResolves)
+	cmd, err := db.Pool.Exec(ctx, sqlQuery, ApplicationStatusCompleted, requestID, ownerUserID, ApplicationStatusOwnerResolves)
 	if err != nil {
 		return false, fmt.Errorf("resolve owner request failed requestID=%d query=%q: %w", requestID, strings.TrimSpace(sqlQuery), err)
 	}

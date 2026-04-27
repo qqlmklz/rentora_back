@@ -30,6 +30,7 @@ type PropertyFilters struct {
 	PriceTo      *int
 	Location     string
 	Sort         string
+	CurrentUserID *int
 }
 // Возвращаем объявления для каталога с фильтрами и сортировкой.
 func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.Property, error) {
@@ -78,6 +79,12 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 			p.total_area,
 			p.city,
 			p.district,
+			EXISTS (
+				SELECT 1
+				FROM contracts c
+				WHERE c.property_id = p.id
+				  AND c.status IN ('active', 'accepted')
+			) AS is_archived,
 			COALESCE(
 				(SELECT array_agg(pi.image_url ORDER BY pi.id)
 				 FROM property_images pi
@@ -86,6 +93,23 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 			) AS photos
 		FROM properties p
 	`
+	activeContractFilter := "NOT EXISTS (SELECT 1 FROM contracts c WHERE c.property_id = p.id AND c.status IN ('active', 'accepted'))"
+	if f.CurrentUserID != nil {
+		args = append(args, *f.CurrentUserID)
+		n := len(args)
+		activeContractFilter = fmt.Sprintf(`(
+			NOT EXISTS (SELECT 1 FROM contracts c WHERE c.property_id = p.id AND c.status IN ('active', 'accepted'))
+			OR p.user_id = $%d
+			OR EXISTS (
+				SELECT 1
+				FROM contracts c
+				WHERE c.property_id = p.id
+				  AND c.status IN ('active', 'accepted')
+				  AND c.tenant_id = $%d
+			)
+		)`, n, n)
+	}
+	clauses = append(clauses, activeContractFilter)
 	if len(clauses) > 0 {
 		query += " WHERE " + strings.Join(clauses, " AND ")
 	}
@@ -118,6 +142,7 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 			&p.TotalArea,
 			&p.City,
 			&p.District,
+			&p.IsArchived,
 			&photos,
 		); err != nil {
 			return nil, err

@@ -22,6 +22,12 @@ func (db *DB) ListPropertiesByUserID(ctx context.Context, userID int) ([]models.
 			p.total_area,
 			p.city,
 			p.district,
+			EXISTS (
+				SELECT 1
+				FROM contracts c
+				WHERE c.property_id = p.id
+				  AND c.status IN ('active', 'accepted')
+			) AS is_archived,
 			COALESCE(
 				(SELECT array_agg(pi.image_url ORDER BY pi.id)
 				 FROM property_images pi
@@ -50,6 +56,7 @@ func (db *DB) ListPropertiesByUserID(ctx context.Context, userID int) ([]models.
 			&p.TotalArea,
 			&p.City,
 			&p.District,
+			&p.IsArchived,
 			&photos,
 		); err != nil {
 			return nil, err

@@ -11,4 +11,10 @@ type Property struct {
 	City         string   `json:"city"`
 	District     string   `json:"district"`
 	Photos       []string `json:"photos"`
+	IsArchived   bool     `json:"isArchived"`
+}
+
+type ProfilePropertiesResponse struct {
+	ActiveListings   []Property `json:"activeListings"`
+	ArchivedListings []Property `json:"archivedListings"`
 }

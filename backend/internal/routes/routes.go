@@ -76,7 +76,7 @@ func userRoutes(g *gin.RouterGroup) {
 
 func propertyRoutes(g *gin.RouterGroup, propertyService *services.PropertyService, jwtSecret string) {
 	// Каталог: список объявлений с фильтрами.
-	g.GET("", handlers.GetProperties(propertyService))
+	g.GET("", handlers.GetProperties(propertyService, jwtSecret))
 	// Создание объявления: только для авторизованных.
 	g.POST("", middleware.Auth(jwtSecret), handlers.CreateProperty(propertyService))
 	// Одно объявление: публично, но с JWT можем показать поля только для владельца.
@@ -90,7 +90,8 @@ func requestRoutes(g *gin.RouterGroup, applicationService *services.ApplicationS
 	g.Use(middleware.Auth(jwtSecret))
 	g.GET("/available-properties", handlers.GetAvailableRequestProperties(applicationService))
 	g.POST("", handlers.CreateRequest(applicationService))
-	g.PATCH("/:id/decision", handlers.DecideRequest(applicationService))
+	g.POST("/:id/set-resolution", handlers.DecideRequest(applicationService))
+	g.POST("/:id/submit-expenses", handlers.SubmitRequestExpense(applicationService))
 	g.PATCH("/:id/expense", handlers.SubmitRequestExpense(applicationService))
 	g.POST("/:id/confirm-tenant-expenses", handlers.ConfirmTenantExpenses(applicationService))
 	g.POST("/:id/complete-owner", handlers.CompleteOwnerResolution(applicationService))

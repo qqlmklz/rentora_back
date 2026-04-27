@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -66,6 +67,12 @@ func (s *ApplicationService) ListProfileRequests(ctx context.Context, userID int
 	if err != nil {
 		return nil, err
 	}
+	sort.Slice(myRows, func(i, j int) bool {
+		return myRows[i].CreatedAt.After(myRows[j].CreatedAt)
+	})
+	sort.Slice(ownerRows, func(i, j int) bool {
+		return ownerRows[i].CreatedAt.After(ownerRows[j].CreatedAt)
+	})
 	log.Printf("[requests-owner] currentUserId=%d ownerPropertyIDs=%v", userID, ownerPropertyIDs)
 	log.Printf("[requests-owner] currentUserId=%d ownerRequestIDs=%v", userID, extractOwnerRequestIDs(ownerRows))
 
@@ -169,7 +176,7 @@ func profileStatusIsCompleted(status string) bool {
 
 func applicationIsArchived(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-	case models.RequestStatusCompleted, models.RequestStatusResolved:
+	case models.RequestStatusCompleted:
 		return true
 	default:
 		return false
@@ -184,12 +191,15 @@ func rowIsArchived(dbValue bool, status string) bool {
 	return applicationIsArchived(status)
 }
 
-func propertyCardFromApplicationRow(r repository.ApplicationRow) models.Property {
+func propertyCardFromApplicationRow(r repository.ApplicationRow) *models.Property {
+	if r.PropertyID <= 0 {
+		return nil
+	}
 	photos := r.PropertyPhotos
 	if photos == nil {
 		photos = []string{}
 	}
-	return models.Property{
+	return &models.Property{
 		ID:           r.PropertyID,
 		Title:        r.PropertyTitle,
 		Price:        r.PropertyPrice,
@@ -202,12 +212,15 @@ func propertyCardFromApplicationRow(r repository.ApplicationRow) models.Property
 	}
 }
 
-func propertyCardFromPropertyRequestRow(r repository.PropertyRequestRow) models.Property {
+func propertyCardFromPropertyRequestRow(r repository.PropertyRequestRow) *models.Property {
+	if r.PropertyID <= 0 {
+		return nil
+	}
 	photos := r.PropertyPhotos
 	if photos == nil {
 		photos = []string{}
 	}
-	return models.Property{
+	return &models.Property{
 		ID:           r.PropertyID,
 		Title:        r.PropertyTitle,
 		Price:        r.PropertyPrice,
@@ -241,6 +254,7 @@ func mapApplicationRowToProfileRequestItem(r repository.ApplicationRow) models.P
 		ExpenseAmount:    r.ExpenseAmount,
 		ExpenseComment:   r.ExpenseComment,
 		ExpensePhotos:    r.ExpensePhotos,
+		ExpensesSubmitted: r.ExpensesSubmitted,
 		CreatedAt:        r.CreatedAt,
 		PropertyID:       r.PropertyID,
 		PropertyTitle:    r.PropertyTitle,
@@ -257,33 +271,21 @@ func mapApplicationRowToProfileRequestItem(r repository.ApplicationRow) models.P
 func mapPropertyRequestRowToItem(r repository.PropertyRequestRow) models.PropertyRequestItem {
 	st := normalizeRequestStatusForAPI(r.Status)
 	arch := profileStatusIsCompleted(st)
-	return models.PropertyRequestItem{
+	it := models.PropertyRequestItem{
 		ID:               r.ID,
 		Title:            r.Title,
 		Description:      r.Description,
 		Status:           st,
-		Priority:         r.Priority,
-		PriorityReason:   r.PriorityReason,
-		ResolutionType:   r.ResolutionType,
-		ResolutionTypeRaw: r.ResolutionType,
-		RequestPhotos:    r.RequestPhotos,
-		ExpenseAmount:    r.ExpenseAmount,
-		ExpenseComment:   r.ExpenseComment,
-		ExpensePhotos:    r.ExpensePhotos,
-		CreatedAt:        r.CreatedAt,
-		PropertyID:       r.PropertyID,
-		PropertyTitle:    r.PropertyTitle,
-		PropertyPhoto:    r.PropertyPhoto,
-		PropertyAddress:  r.PropertyAddress,
-		PropertyCity:     r.PropertyCity,
-		PropertyDistrict: r.PropertyDistrict,
-		Property:         propertyCardFromPropertyRequestRow(r),
 		RequesterID:      r.RequesterID,
 		RequesterName:    r.RequesterName,
 		PropertyOwnerID:  r.PropertyOwnerID,
 		TenantExpensesConfirmedAt: nullTimeToPtr(r.TenantExpensesConfirmedAt),
 		IsArchived:       arch,
 	}
+	if property := propertyCardFromPropertyRequestRow(r); property != nil {
+		it.Property = property
+	}
+	return it
 }
 
 func extractOwnerRequestIDs(rows []repository.PropertyRequestRow) []int {
@@ -363,7 +365,9 @@ func (s *ApplicationService) CreateRequest(ctx context.Context, userID int, in m
 		ExpenseAmount:  row.ExpenseAmount,
 		ExpenseComment: row.ExpenseComment,
 		ExpensePhotos:  row.ExpensePhotos,
+		ExpensesSubmitted: row.ExpensesSubmitted,
 		CreatedAt:      row.CreatedAt,
+		PropertyOwnerID: row.PropertyOwnerID,
 	}, nil
 }
 
@@ -391,7 +395,7 @@ func (s *ApplicationService) DecideRequest(ctx context.Context, userID, requestI
 		log.Printf("[requests-decision] requestId=%d currentUserId=%d forbidden propertyOwnerId=%d", requestID, userID, info.PropertyOwnerID)
 		return nil, ErrRequestDecisionForbidden
 	}
-	if info.Status != repository.ApplicationStatusPending && info.Status != repository.ApplicationStatusInReview {
+	if info.Status != repository.ApplicationStatusPending {
 		log.Printf("[requests-decision] requestId=%d currentUserId=%d invalid_status=%s", requestID, userID, info.Status)
 		return nil, ErrRequestDecisionInvalidStatus
 	}
@@ -420,6 +424,7 @@ func (s *ApplicationService) DecideRequest(ctx context.Context, userID, requestI
 		ExpenseAmount:    info.ExpenseAmount,
 		ExpenseComment:   info.ExpenseComment,
 		ExpensePhotos:    info.ExpensePhotos,
+		ExpensesSubmitted: info.ExpensesSubmitted,
 	}, nil
 }
 
@@ -442,7 +447,7 @@ func (s *ApplicationService) SubmitRequestExpense(ctx context.Context, userID, r
 	}
 
 	comment := strings.TrimSpace(expenseComment)
-	nextStatus := repository.ApplicationStatusWaitingExpense
+	nextStatus := repository.ApplicationStatusTenantResolves
 	if err := s.repo.ApplyRequestExpense(ctx, requestID, expenseAmount, comment, expensePhotos, nextStatus); err != nil {
 		return nil, err
 	}
@@ -468,10 +473,7 @@ func (s *ApplicationService) ConfirmTenantExpenses(ctx context.Context, ownerUse
 	if info.ResolutionType == nil || !strings.EqualFold(strings.TrimSpace(*info.ResolutionType), models.RequestResolutionTypeTenant) {
 		return nil, ErrConfirmTenantExpensesInvalidResolution
 	}
-	if info.ExpenseAmount == nil {
-		return nil, ErrConfirmTenantExpensesNoExpenses
-	}
-	if info.ExpenseComment == nil || strings.TrimSpace(*info.ExpenseComment) == "" {
+	if !info.ExpensesSubmitted {
 		return nil, ErrConfirmTenantExpensesNoExpenses
 	}
 	if info.Status == repository.ApplicationStatusCompleted {
@@ -480,7 +482,7 @@ func (s *ApplicationService) ConfirmTenantExpenses(ctx context.Context, ownerUse
 	if info.TenantExpensesConfirmedAt.Valid {
 		return nil, ErrConfirmTenantExpensesAlready
 	}
-	if info.Status != repository.ApplicationStatusWaitingExpense {
+	if info.Status != repository.ApplicationStatusTenantResolves {
 		return nil, ErrConfirmTenantExpensesWrongStatus
 	}
 
@@ -528,46 +530,9 @@ func (s *ApplicationService) ConfirmTenantExpenses(ctx context.Context, ownerUse
 	return resp, nil
 }
 
-// CompleteOwnerResolution завершает сценарий «устраняет владелец»: owner_resolves → resolved.
+// CompleteOwnerResolution завершает сценарий «устраняет владелец»: owner_resolves → completed.
 func (s *ApplicationService) CompleteOwnerResolution(ctx context.Context, ownerUserID, requestID int) (*models.PropertyRequestItem, error) {
-	info, err := s.repo.GetRequestDecisionInfo(ctx, requestID)
-	if err != nil {
-		if errors.Is(err, repository.ErrRequestNotFound) {
-			return nil, ErrCompleteOwnerNotFound
-		}
-		return nil, err
-	}
-	if info.PropertyOwnerID != ownerUserID {
-		return nil, ErrCompleteOwnerForbidden
-	}
-	if info.ResolutionType == nil || !strings.EqualFold(strings.TrimSpace(*info.ResolutionType), models.RequestResolutionTypeOwner) {
-		return nil, ErrCompleteOwnerInvalidResolution
-	}
-	if info.Status == repository.ApplicationStatusResolved || info.Status == repository.ApplicationStatusCompleted {
-		return nil, ErrCompleteOwnerAlreadyDone
-	}
-	if info.Status != repository.ApplicationStatusOwnerResolves {
-		return nil, ErrCompleteOwnerWrongStatus
-	}
-
-	ok, err := s.repo.ResolveOwnerRequest(ctx, requestID, ownerUserID)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, ErrCompleteOwnerWrongStatus
-	}
-
-	row, err := s.repo.GetPropertyRequestForOwner(ctx, ownerUserID, requestID)
-	if err != nil {
-		if errors.Is(err, repository.ErrRequestNotFound) {
-			return nil, ErrCompleteOwnerNotFound
-		}
-		return nil, err
-	}
-	it := mapPropertyRequestRowToItem(*row)
-	log.Printf("[requests-complete-owner] requestId=%d ownerUserId=%d status=%s isArchived=%v", requestID, ownerUserID, it.Status, it.IsArchived)
-	return &it, nil
+	return s.CompleteOwnerRequest(ctx, ownerUserID, requestID)
 }
 
 // CompleteOwnerRequest завершает owner flow: owner_resolves → completed в БД.
@@ -585,7 +550,7 @@ func (s *ApplicationService) CompleteOwnerRequest(ctx context.Context, ownerUser
 	if info.ResolutionType == nil || !strings.EqualFold(strings.TrimSpace(*info.ResolutionType), models.RequestResolutionTypeOwner) {
 		return nil, ErrCompleteOwnerInvalidResolution
 	}
-	if info.Status == repository.ApplicationStatusResolved || info.Status == repository.ApplicationStatusCompleted {
+	if info.Status == repository.ApplicationStatusCompleted {
 		return nil, ErrCompleteOwnerAlreadyDone
 	}
 	if info.Status != repository.ApplicationStatusOwnerResolves {
@@ -657,6 +622,7 @@ func mapRequestExpenseResponse(info *repository.RequestDecisionRow) *models.Requ
 		ExpenseAmount:      amount,
 		ExpenseComment:     comment,
 		ExpensePhotos:      photos,
+		ExpensesSubmitted:  info.ExpensesSubmitted,
 		CreatedAt:          info.CreatedAt,
 		PropertyID:         info.PropertyID,
 		PropertyTitle:      info.PropertyTitle,
@@ -666,6 +632,7 @@ func mapRequestExpenseResponse(info *repository.RequestDecisionRow) *models.Requ
 		PropertyDistrict:   info.PropertyDistrict,
 		RequesterID:        info.RequesterID,
 		RequesterName:      info.RequesterName,
+		PropertyOwnerID:    info.PropertyOwnerID,
 		IsArchived:         rowIsArchived(info.IsArchived, info.Status),
 	}
 }
@@ -708,6 +675,7 @@ func mapConfirmTenantExpensesResponse(info *repository.RequestDecisionRow) *mode
 		ExpenseAmount:      amount,
 		ExpenseComment:     comment,
 		ExpensePhotos:      photos,
+		ExpensesSubmitted:  info.ExpensesSubmitted,
 		ConfirmedAt:        confirmedAt,
 		CreatedAt:          info.CreatedAt,
 		PropertyID:         info.PropertyID,

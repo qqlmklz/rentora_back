@@ -87,6 +87,7 @@ func (db *DB) migrate(ctx context.Context) error {
 			expense_amount DOUBLE PRECISION,
 			expense_comment TEXT,
 			expense_photos JSONB NOT NULL DEFAULT '[]'::jsonb,
+			expenses_submitted BOOLEAN NOT NULL DEFAULT FALSE,
 			tenant_expenses_confirmed_at TIMESTAMP,
 			created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
 			updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
@@ -147,6 +148,10 @@ func (db *DB) migrate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS expenses_submitted BOOLEAN NOT NULL DEFAULT FALSE`)
+	if err != nil {
+		return err
+	}
 	_, err = db.Pool.Exec(ctx, `ALTER TABLE applications ADD COLUMN IF NOT EXISTS tenant_expenses_confirmed_at TIMESTAMP`)
 	if err != nil {
 		return err
@@ -155,7 +160,11 @@ func (db *DB) migrate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.Pool.Exec(ctx, `UPDATE applications SET is_archived = true WHERE status IN ('completed', 'resolved')`)
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET status = 'completed' WHERE status = 'resolved'`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET is_archived = true WHERE status = 'completed'`)
 	if err != nil {
 		return err
 	}
@@ -188,6 +197,10 @@ func (db *DB) migrate(ctx context.Context) error {
 		return err
 	}
 	_, err = db.Pool.Exec(ctx, `UPDATE applications SET expense_photos = '[]'::jsonb WHERE expense_photos IS NULL`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `UPDATE applications SET expenses_submitted = true WHERE expense_amount IS NOT NULL OR TRIM(COALESCE(expense_comment, '')) <> '' OR COALESCE(jsonb_array_length(expense_photos), 0) > 0`)
 	if err != nil {
 		return err
 	}

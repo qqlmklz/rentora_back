@@ -29,7 +29,7 @@ const (
 )
 
 // Обработчик GET /api/properties для каталога.
-func GetProperties(propertyService *services.PropertyService) gin.HandlerFunc {
+func GetProperties(propertyService *services.PropertyService, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		categoryRaw := strings.TrimSpace(c.Query("category"))
 		propertyTypeRaw := strings.TrimSpace(c.Query("propertyType"))
@@ -50,6 +50,9 @@ func GetProperties(propertyService *services.PropertyService) gin.HandlerFunc {
 			PropertyType: propertyType,
 			Location:     location,
 			Sort:         sortValue,
+		}
+		if uid, ok := middleware.ParseUserIDFromBearer(c, jwtSecret); ok {
+			filters.CurrentUserID = &uid
 		}
 
 		if roomsRaw != "" {
@@ -271,7 +274,18 @@ func GetMyProperties(propertyService *services.PropertyService) gin.HandlerFunc 
 			utils.JSONErrorInternal(c, "Ошибка загрузки объявлений")
 			return
 		}
-		c.JSON(http.StatusOK, props)
+		resp := models.ProfilePropertiesResponse{
+			ActiveListings:   []models.Property{},
+			ArchivedListings: []models.Property{},
+		}
+		for i := range props {
+			if props[i].IsArchived {
+				resp.ArchivedListings = append(resp.ArchivedListings, props[i])
+			} else {
+				resp.ActiveListings = append(resp.ActiveListings, props[i])
+			}
+		}
+		c.JSON(http.StatusOK, resp)
 	}
 }
 
