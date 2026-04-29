@@ -30,30 +30,34 @@ var (
 
 // Фильтры, которые приходят для каталога.
 type CatalogFilters struct {
-	Category     string
-	PropertyType string
-	RoomsExact   *int
-	RoomsMin     *int
-	PriceFrom    *int
-	PriceTo      *int
-	Location     string
-	Sort         string
+	Category      string
+	PropertyType  string
+	RoomsExact    *int
+	RoomsMin      *int
+	PriceFrom     *int
+	PriceTo       *int
+	Location      string
+	Sort          string
 	CurrentUserID *int
 }
+
+const (
+	recommendationsLimit = 6
+)
 
 // Возвращаем объявления для /catalog с примененными фильтрами и сортировкой.
 func (s *PropertyService) ListForCatalog(ctx context.Context, f CatalogFilters) ([]models.Property, error) {
 	log.Printf("[properties] catalog service filters: category=%q propertyType=%q roomsExact=%v roomsMin=%v priceFrom=%v priceTo=%v location=%q sort=%q",
 		f.Category, f.PropertyType, f.RoomsExact, f.RoomsMin, f.PriceFrom, f.PriceTo, f.Location, f.Sort)
 	return s.repo.ListProperties(ctx, repository.PropertyFilters{
-		Category:     f.Category,
-		PropertyType: f.PropertyType,
-		RoomsExact:   f.RoomsExact,
-		RoomsMin:     f.RoomsMin,
-		PriceFrom:    f.PriceFrom,
-		PriceTo:      f.PriceTo,
-		Location:     f.Location,
-		Sort:         f.Sort,
+		Category:      f.Category,
+		PropertyType:  f.PropertyType,
+		RoomsExact:    f.RoomsExact,
+		RoomsMin:      f.RoomsMin,
+		PriceFrom:     f.PriceFrom,
+		PriceTo:       f.PriceTo,
+		Location:      f.Location,
+		Sort:          f.Sort,
 		CurrentUserID: f.CurrentUserID,
 	})
 }
@@ -69,6 +73,16 @@ func (s *PropertyService) Create(ctx context.Context, userID int, in models.Crea
 // Возвращаем одно объявление для публичной страницы деталей.
 func (s *PropertyService) GetByID(ctx context.Context, id int) (*models.PropertyDetail, error) {
 	return s.repo.GetPropertyByID(ctx, id)
+}
+
+// Сохраняем просмотр объявления для последующих рекомендаций.
+func (s *PropertyService) TrackView(ctx context.Context, userID, propertyID int) error {
+	return s.repo.UpsertPropertyView(ctx, userID, propertyID)
+}
+
+// Возвращаем рекомендации по последним просмотренным объявлениям пользователя.
+func (s *PropertyService) GetRecommendations(ctx context.Context, userID int) ([]models.Property, error) {
+	return s.repo.ListRecommendations(ctx, userID, recommendationsLimit)
 }
 
 // Возвращаем объявления пользователя в формате карточек.
@@ -217,4 +231,3 @@ func isPropertyTypeAllowed(category, propertyType string) bool {
 		return false
 	}
 }
-

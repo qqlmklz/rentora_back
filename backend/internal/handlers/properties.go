@@ -22,10 +22,10 @@ import (
 )
 
 const (
-	propertyPhotosKey       = "photos"
-	existingPhotosFormKey   = "existingPhotos"
-	minPropertyPhotos       = 5
-	propertyUploadDir       = "uploads/properties"
+	propertyPhotosKey     = "photos"
+	existingPhotosFormKey = "existingPhotos"
+	minPropertyPhotos     = 5
+	propertyUploadDir     = "uploads/properties"
 )
 
 // Обработчик GET /api/properties для каталога.
@@ -116,6 +116,28 @@ func GetProperties(propertyService *services.PropertyService, jwtSecret string) 
 	}
 }
 
+// Обработчик GET /api/listings/recommendations (JWT).
+func GetRecommendations(propertyService *services.PropertyService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID, ok := middleware.GetUserID(c)
+		if !ok {
+			utils.JSONErrorUnauthorized(c, "Требуется авторизация")
+			return
+		}
+
+		listings, err := propertyService.GetRecommendations(c.Request.Context(), userID)
+		if err != nil {
+			log.Printf("[properties] recommendations error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"recommendations": listings,
+		})
+	}
+}
+
 func normalizeCategoryCatalogFilter(v string) string {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "residential", "жилая":
@@ -186,6 +208,11 @@ func GetPropertyByID(propertyService *services.PropertyService, jwtSecret string
 			return
 		}
 		uid, ok := middleware.ParseUserIDFromBearer(c, jwtSecret)
+		if ok {
+			if err := propertyService.TrackView(c.Request.Context(), uid, id); err != nil {
+				log.Printf("[properties] track view failed property_id=%d user_id=%d err=%v", id, uid, err)
+			}
+		}
 		if !ok || detail.OwnerID == nil || *detail.OwnerID != uid {
 			detail.ApartmentNumber = nil
 		}
@@ -733,4 +760,3 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 
 	return req, nil
 }
-

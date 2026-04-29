@@ -20,18 +20,20 @@ var ErrPropertyNotFound = errors.New("property not found")
 
 // Ошибка, когда пользователь не владелец объявления.
 var ErrPropertyForbidden = errors.New("property forbidden")
+
 // Фильтры для каталога.
 type PropertyFilters struct {
-	Category     string
-	PropertyType string
-	RoomsExact   *int
-	RoomsMin     *int
-	PriceFrom    *int
-	PriceTo      *int
-	Location     string
-	Sort         string
+	Category      string
+	PropertyType  string
+	RoomsExact    *int
+	RoomsMin      *int
+	PriceFrom     *int
+	PriceTo       *int
+	Location      string
+	Sort          string
 	CurrentUserID *int
 }
+
 // Возвращаем объявления для каталога с фильтрами и сортировкой.
 func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.Property, error) {
 	var (
@@ -315,4 +317,141 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 	d.Photos = photos
 
 	return &d, nil
+}
+
+// UpsertPropertyView фиксирует последнее время просмотра объявления пользователем.
+func (db *DB) UpsertPropertyView(ctx context.Context, userID, propertyID int) error {
+	_, err := db.Pool.Exec(ctx, `
+		INSERT INTO property_views (user_id, property_id, viewed_at)
+		VALUES ($1, $2, NOW())
+		ON CONFLICT (user_id, property_id)
+		DO UPDATE SET viewed_at = EXCLUDED.viewed_at
+	`, userID, propertyID)
+	return err
+}
+
+// ListRecommendations возвращает похожие объявления по последнему просмотренному.
+func (db *DB) ListRecommendations(ctx context.Context, userID, limit int) ([]models.Property, error) {
+	rows, err := db.Pool.Query(ctx, `
+		WITH last_view AS (
+			SELECT pv.property_id
+			FROM property_views pv
+			WHERE pv.user_id = $1
+			ORDER BY pv.viewed_at DESC
+			LIMIT 1
+		),
+		similar_ids AS (
+			SELECT DISTINCT p2.id
+			FROM last_view lv
+			JOIN properties p1 ON p1.id = lv.property_id
+			JOIN properties p2
+			  ON p2.city = p1.city
+			 AND p2.property_type = p1.property_type
+			 AND p2.id <> p1.id
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM contracts c
+				WHERE c.property_id = p2.id
+				  AND c.status IN ('active', 'accepted')
+			)
+		)
+		SELECT
+			p.id,
+			p.title,
+			p.price,
+			p.property_type,
+			p.rooms,
+			p.total_area,
+			p.city,
+			p.district,
+			FALSE AS is_archived,
+			COALESCE(
+				(SELECT array_agg(pi.image_url ORDER BY pi.id)
+				 FROM property_images pi
+				 WHERE pi.property_id = p.id),
+				'{}'
+			) AS photos
+		FROM properties p
+		JOIN similar_ids s ON s.id = p.id
+		ORDER BY p.created_at DESC
+		LIMIT $2
+	`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	props, err := scanPropertyCards(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(props) > 0 {
+		return props, nil
+	}
+
+	// Fallback, если истории просмотров еще нет: просто свежие неархивные объявления.
+	fallbackRows, err := db.Pool.Query(ctx, `
+		SELECT
+			p.id,
+			p.title,
+			p.price,
+			p.property_type,
+			p.rooms,
+			p.total_area,
+			p.city,
+			p.district,
+			FALSE AS is_archived,
+			COALESCE(
+				(SELECT array_agg(pi.image_url ORDER BY pi.id)
+				 FROM property_images pi
+				 WHERE pi.property_id = p.id),
+				'{}'
+			) AS photos
+		FROM properties p
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM contracts c
+			WHERE c.property_id = p.id
+			  AND c.status IN ('active', 'accepted')
+		)
+		ORDER BY p.created_at DESC
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer fallbackRows.Close()
+
+	return scanPropertyCards(fallbackRows)
+}
+
+func scanPropertyCards(rows pgx.Rows) ([]models.Property, error) {
+	props := []models.Property{}
+	for rows.Next() {
+		var p models.Property
+		var photos []string
+		if err := rows.Scan(
+			&p.ID,
+			&p.Title,
+			&p.Price,
+			&p.PropertyType,
+			&p.Rooms,
+			&p.TotalArea,
+			&p.City,
+			&p.District,
+			&p.IsArchived,
+			&photos,
+		); err != nil {
+			return nil, err
+		}
+		if photos == nil {
+			photos = []string{}
+		}
+		p.Photos = photos
+		props = append(props, p)
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	return props, nil
 }

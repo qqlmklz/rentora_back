@@ -33,6 +33,7 @@ func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthServic
 
 		properties := api.Group("/properties")
 		propertyRoutes(properties, propertyService, jwtSecret)
+		api.GET("/listings/recommendations", middleware.Auth(jwtSecret), handlers.GetRecommendations(propertyService))
 
 		requests := api.Group("/requests")
 		requestRoutes(requests, applicationService, jwtSecret)

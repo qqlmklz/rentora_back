@@ -328,6 +328,21 @@ func (db *DB) migrate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	_, err = db.Pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS property_views (
+			user_id     INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			property_id INT NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+			viewed_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+			PRIMARY KEY (user_id, property_id)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Pool.Exec(ctx, `CREATE INDEX IF NOT EXISTS idx_property_views_user_viewed_at ON property_views(user_id, viewed_at DESC)`)
+	if err != nil {
+		return err
+	}
 
 	_, err = db.Pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS chats (
