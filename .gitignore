@@ -32,6 +32,3 @@ logs/
 # Test
 coverage.out
 *.test
-
-# Uploads
-uploads/
