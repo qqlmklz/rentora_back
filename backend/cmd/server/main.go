@@ -66,11 +66,12 @@ func main() {
 	hub := ws.NewHub()
 	chatService := services.NewChatService(db, hub)
 	contractService := services.NewContractService(db, hub)
+	addressService := services.NewAddressService()
 
 	gin.SetMode(cfg.GinMode)
 	r := gin.New()
 
-	routes.Setup(r, cfg.CORSOrigins, authService, profileService, propertyService, applicationService, favoritesService, chatService, contractService, hub, cfg.JWTSecret)
+	routes.Setup(r, cfg.CORSOrigins, authService, profileService, propertyService, applicationService, favoritesService, chatService, contractService, addressService, hub, cfg.JWTSecret)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("Rentora backend starting on %s", addr)

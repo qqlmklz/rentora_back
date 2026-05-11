@@ -10,7 +10,7 @@ import (
 )
 
 // Тут настраиваем все роуты и middleware на переданном движке.
-func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthService, profileService *services.ProfileService, propertyService *services.PropertyService, applicationService *services.ApplicationService, favoritesService *services.FavoritesService, chatService *services.ChatService, contractService *services.ContractService, hub *ws.Hub, jwtSecret string) {
+func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthService, profileService *services.ProfileService, propertyService *services.PropertyService, applicationService *services.ApplicationService, favoritesService *services.FavoritesService, chatService *services.ChatService, contractService *services.ContractService, addressService *services.AddressService, hub *ws.Hub, jwtSecret string) {
 	r.Use(middleware.RecoveryJSON())
 	r.Use(middleware.Logging())
 	r.Use(middleware.CORS(corsOrigins))
@@ -34,6 +34,7 @@ func Setup(r *gin.Engine, corsOrigins []string, authService *services.AuthServic
 		properties := api.Group("/properties")
 		propertyRoutes(properties, propertyService, jwtSecret)
 		api.GET("/listings/recommendations", middleware.Auth(jwtSecret), handlers.GetRecommendations(propertyService))
+		api.POST("/address/suggestions", handlers.GetAddressSuggestions(addressService))
 
 		requests := api.Group("/requests")
 		requestRoutes(requests, applicationService, jwtSecret)
