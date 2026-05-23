@@ -209,6 +209,7 @@ func propertyCardFromApplicationRow(r repository.ApplicationRow) *models.Propert
 		City:         r.PropertyCity,
 		District:     r.PropertyDistrict,
 		Photos:       photos,
+		OwnerID:      r.PropertyOwnerID,
 	}
 }
 
@@ -230,6 +231,7 @@ func propertyCardFromPropertyRequestRow(r repository.PropertyRequestRow) *models
 		City:         r.PropertyCity,
 		District:     r.PropertyDistrict,
 		Photos:       photos,
+		OwnerID:      r.PropertyOwnerID,
 	}
 }
 
@@ -262,6 +264,7 @@ func mapApplicationRowToProfileRequestItem(r repository.ApplicationRow) models.P
 		PropertyAddress:  r.PropertyAddress,
 		PropertyCity:     r.PropertyCity,
 		PropertyDistrict: r.PropertyDistrict,
+		PropertyOwnerID:  r.PropertyOwnerID,
 		Property:         propertyCardFromApplicationRow(r),
 		TenantExpensesConfirmedAt: nullTimeToPtr(r.TenantExpensesConfirmedAt),
 		IsArchived:       arch,

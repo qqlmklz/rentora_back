@@ -12,6 +12,7 @@ type Property struct {
 	District     string   `json:"district"`
 	Photos       []string `json:"photos"`
 	IsArchived   bool     `json:"isArchived"`
+	OwnerID      int      `json:"ownerId,omitempty"`
 }
 
 type ProfilePropertiesResponse struct {

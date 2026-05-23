@@ -47,6 +47,8 @@ const (
 
 // Возвращаем объявления для /catalog с примененными фильтрами и сортировкой.
 func (s *PropertyService) ListForCatalog(ctx context.Context, f CatalogFilters) ([]models.Property, error) {
+	f.Category = models.NormalizeCategoryStored(f.Category)
+	f.PropertyType = models.NormalizePropertyTypeCatalogFilter(f.PropertyType)
 	log.Printf("[properties] catalog service filters: category=%q propertyType=%q roomsExact=%v roomsMin=%v priceFrom=%v priceTo=%v location=%q sort=%q",
 		f.Category, f.PropertyType, f.RoomsExact, f.RoomsMin, f.PriceFrom, f.PriceTo, f.Location, f.Sort)
 	return s.repo.ListProperties(ctx, repository.PropertyFilters{
@@ -64,7 +66,9 @@ func (s *PropertyService) ListForCatalog(ctx context.Context, f CatalogFilters) 
 
 // Создаем объявление и сохраняем URL фото. Заодно проверяем связку category и propertyType.
 func (s *PropertyService) Create(ctx context.Context, userID int, in models.CreatePropertyInput, imageURLs []string) (int, error) {
-	if !isPropertyTypeAllowed(in.Category, in.PropertyType) {
+	in.Category = models.NormalizeCategoryStored(in.Category)
+	in.PropertyType = models.NormalizePropertySubcategoryAPI(in.PropertyType)
+	if !models.IsPropertyTypeAllowedForCategory(in.Category, in.PropertyType) {
 		return 0, ErrInvalidCategoryPropertyType
 	}
 	return s.repo.CreatePropertyWithImages(ctx, userID, in, imageURLs)
@@ -110,7 +114,7 @@ func (s *PropertyService) UpdateOwned(ctx context.Context, userID, propertyID in
 		return nil, repository.ErrPropertyForbidden
 	}
 	models.ApplyPropertyPatch(&base, payload.UpdatePropertyPatch)
-	if !isPropertyTypeAllowed(base.Category, base.PropertyType) {
+	if !models.IsPropertyTypeAllowedForCategory(base.Category, base.PropertyType) {
 		return nil, ErrInvalidCategoryPropertyType
 	}
 
@@ -213,21 +217,3 @@ func localUploadPath(url string) string {
 	return strings.TrimPrefix(url, "/")
 }
 
-func isPropertyTypeAllowed(category, propertyType string) bool {
-	// Категорию ждем как "жилая" / "коммерческая" (если надо, потом добавим и residential/commercial).
-	residential := map[string]bool{
-		"квартира": true, "комната": true, "дом/дача": true, "коттедж": true,
-	}
-	commercial := map[string]bool{
-		"офис": true, "коворкинг": true, "здание": true, "склад": true,
-	}
-	switch category {
-	case "жилая":
-		return residential[propertyType]
-	case "коммерческая":
-		return commercial[propertyType]
-	default:
-		// Если category не распознали, дальше обработчик вернет bad request.
-		return false
-	}
-}

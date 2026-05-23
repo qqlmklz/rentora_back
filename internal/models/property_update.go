@@ -58,10 +58,10 @@ func ApplyPropertyPatch(base *CreatePropertyInput, patch UpdatePropertyPatch) {
 		base.RentType = *patch.RentType
 	}
 	if patch.Category != nil {
-		base.Category = *patch.Category
+		base.Category = NormalizeCategoryStored(*patch.Category)
 	}
 	if patch.PropertyType != nil {
-		base.PropertyType = *patch.PropertyType
+		base.PropertyType = NormalizePropertySubcategoryAPI(*patch.PropertyType)
 	}
 	if patch.Title != nil {
 		base.Title = *patch.Title

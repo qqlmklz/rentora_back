@@ -32,7 +32,7 @@ type CreateRequestBody struct {
 
 // ProfileRequestsEntry — допустимый элемент массивов activeRequests и archivedRequests в GET /api/profile/requests.
 // В JSON это гетерогенный массив объектов без поля-типа: каждый элемент либо ProfileRequestItem, либо PropertyRequestItem
-// (различие по набору полей: у «моих» заявок есть category и priorityStatus/priorityScore; у заявок по моим объектам — propertyOwnerId).
+// (различие по набору полей: у «моих» заявок есть category и priorityStatus/priorityScore; у заявок по моим объектам — без category/priorityStatus).
 type ProfileRequestsEntry interface {
 	profileRequestsEntry()
 }
@@ -67,6 +67,7 @@ type ProfileRequestItem struct {
 	PropertyAddress  string    `json:"propertyAddress"`
 	PropertyCity     string    `json:"propertyCity"`
 	PropertyDistrict string    `json:"propertyDistrict"`
+	PropertyOwnerID  int       `json:"propertyOwnerId"`
 	Property         *Property `json:"property,omitempty"`
 	TenantExpensesConfirmedAt *time.Time `json:"confirmedAt,omitempty"`
 	IsArchived       bool      `json:"isArchived"`

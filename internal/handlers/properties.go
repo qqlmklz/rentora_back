@@ -39,8 +39,8 @@ func GetProperties(propertyService *services.PropertyService, jwtSecret string) 
 		location := strings.TrimSpace(c.Query("location"))
 		sortRaw := strings.TrimSpace(c.DefaultQuery("sort", "newest"))
 		sortValue := strings.ToLower(sortRaw)
-		category := normalizeCategoryCatalogFilter(categoryRaw)
-		propertyType := normalizePropertyTypeCatalogFilter(propertyTypeRaw)
+		category := models.NormalizeCategoryStored(categoryRaw)
+		propertyType := models.NormalizePropertyTypeCatalogFilter(propertyTypeRaw)
 
 		log.Printf("[properties] catalog incoming query: raw=%q category=%q propertyType=%q rooms=%q priceFrom=%q priceTo=%q location=%q sort=%q",
 			c.Request.URL.RawQuery, categoryRaw, propertyTypeRaw, roomsRaw, priceFromRaw, priceToRaw, location, sortRaw)
@@ -57,9 +57,6 @@ func GetProperties(propertyService *services.PropertyService, jwtSecret string) 
 
 		if roomsRaw != "" {
 			switch roomsRaw {
-			case "studio":
-				v := 0
-				filters.RoomsExact = &v
 			case "6+":
 				v := 6
 				filters.RoomsMin = &v
@@ -99,7 +96,7 @@ func GetProperties(propertyService *services.PropertyService, jwtSecret string) 
 			utils.JSONErrorBadRequest(c, "Некорректный параметр sort")
 			return
 		}
-		if filters.Category != "" && filters.PropertyType != "" && !isCatalogPropertyTypeAllowed(filters.Category, filters.PropertyType) {
+		if filters.Category != "" && filters.PropertyType != "" && !models.IsPropertyTypeAllowedForCategory(filters.Category, filters.PropertyType) {
 			log.Printf("[properties] catalog category/propertyType mismatch: category=%q propertyType=%q action=ignore_propertyType", filters.Category, filters.PropertyType)
 			filters.PropertyType = ""
 		}
@@ -136,56 +133,6 @@ func GetRecommendations(propertyService *services.PropertyService) gin.HandlerFu
 			"recommendations": listings,
 		})
 	}
-}
-
-func normalizeCategoryCatalogFilter(v string) string {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "residential", "жилая":
-		return "жилая"
-	case "commercial", "коммерческая":
-		return "коммерческая"
-	default:
-		return strings.TrimSpace(v)
-	}
-}
-
-func normalizePropertyTypeCatalogFilter(v string) string {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "apartment", "квартира":
-		return "квартира"
-	case "room", "комната":
-		return "комната"
-	case "house", "дом/дача":
-		return "дом/дача"
-	case "cottage", "коттедж":
-		return "коттедж"
-	case "office", "офис":
-		return "офис"
-	case "coworking", "коворкинг":
-		return "коворкинг"
-	case "building", "здание":
-		return "здание"
-	case "warehouse", "склад":
-		return "склад"
-	default:
-		return strings.TrimSpace(v)
-	}
-}
-
-func isCatalogPropertyTypeAllowed(category, propertyType string) bool {
-	switch category {
-	case "жилая":
-		switch propertyType {
-		case "квартира", "комната", "дом/дача", "коттедж":
-			return true
-		}
-	case "коммерческая":
-		switch propertyType {
-		case "офис", "коворкинг", "здание", "склад":
-			return true
-		}
-	}
-	return false
 }
 
 // Обработчик GET /api/properties/:id (публичный). С Bearer JWT владелец видит apartmentNumber.
@@ -462,42 +409,6 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 		}
 	}
 
-	// Поле category: residential -> жилая, commercial -> коммерческая.
-	mapCategory := func(v string) string {
-		switch v {
-		case "residential":
-			return "жилая"
-		case "commercial":
-			return "коммерческая"
-		default:
-			return v
-		}
-	}
-
-	// Поле subcategory переводим в propertyType.
-	mapPropertyType := func(v string) string {
-		switch v {
-		case "apartment":
-			return "квартира"
-		case "room":
-			return "комната"
-		case "house":
-			return "дом/дача"
-		case "cottage":
-			return "коттедж"
-		case "office":
-			return "офис"
-		case "coworking":
-			return "коворкинг"
-		case "building":
-			return "здание"
-		case "warehouse":
-			return "склад"
-		default:
-			return v
-		}
-	}
-
 	// Поле residentialType переводим в housingType.
 	mapHousingType := func(v string) string {
 		switch v {
@@ -527,14 +438,14 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 	// Читаем поля и приводим к нужному формату.
 
 	categoryRaw := get("category")
-	category := mapCategory(categoryRaw)
-	isCommercial := category == "коммерческая"
+	category := models.NormalizeCategoryStored(categoryRaw)
+	subcategoryRaw := strings.TrimSpace(get("subcategory"))
 
 	req := models.CreatePropertyInput{
 		Title:        get("title"),
 		RentType:     mapRentType(get("rentType")),
 		Category:     category,
-		PropertyType: mapPropertyType(get("subcategory")),
+		PropertyType: models.NormalizePropertySubcategoryAPI(subcategoryRaw),
 		Address:      get("address"),
 		City:         get("city"),
 		District:     get("district"),
@@ -637,13 +548,13 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 	}
 	req.TotalArea = totalArea
 
-	// Поле rooms: studio -> 0, 6+ -> 6, иначе обычное число.
-	// Для коммерческой недвижимости rooms не обязателен.
-	roomsStr := get("rooms")
+	// Поле rooms: 6+ -> 6, иначе число. Для студии и коммерческой rooms не обязателен.
+	roomsStr := strings.TrimSpace(get("rooms"))
+	if roomsStr == "studio" {
+		return models.CreatePropertyInput{}, fmt.Errorf("Для типа «Студия» укажите subcategory=studio, а не rooms=studio")
+	}
 	if roomsStr != "" {
 		switch roomsStr {
-		case "studio":
-			req.Rooms = 0
 		case "6+":
 			req.Rooms = 6
 		default:
@@ -653,8 +564,6 @@ func parseCreatePropertyInput(c *gin.Context) (models.CreatePropertyInput, error
 			}
 			req.Rooms = rooms
 		}
-	} else if !isCommercial {
-		// Для жилой недвижимости rooms обязателен, но в missing не дублируем — уже проверили выше.
 	}
 
 	// Разбираем bool-поля.

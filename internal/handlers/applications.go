@@ -332,7 +332,7 @@ func GetAvailableRequestProperties(applicationService *services.ApplicationServi
 	}
 }
 
-// DecideRequest handles PATCH /api/requests/:id/decision.
+// DecideRequest handles POST /api/requests/:id/set-resolution (только владелец объявления).
 func DecideRequest(applicationService *services.ApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
