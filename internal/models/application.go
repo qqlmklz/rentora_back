@@ -209,6 +209,19 @@ type ConfirmTenantExpenseRequestInfo struct {
 	IsArchived bool   `json:"isArchived"`
 }
 
+// RequestCompleteSnapshot — минимальный снимок заявки после завершения (POST complete-owner).
+type RequestCompleteSnapshot struct {
+	ID         int    `json:"id"`
+	Status     string `json:"status"`
+	IsArchived bool   `json:"isArchived"`
+}
+
+// CompleteRequestResponse — ответ POST /api/requests/:id/complete-owner и complete-owner-request.
+type CompleteRequestResponse struct {
+	Success bool                  `json:"success"`
+	Request RequestCompleteSnapshot `json:"request"`
+}
+
 // Ответ POST /api/requests/:id/confirm-tenant-expenses.
 type ConfirmTenantExpensesResponse struct {
 	Request ConfirmTenantExpenseRequestInfo `json:"request"`

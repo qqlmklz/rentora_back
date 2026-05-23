@@ -439,7 +439,6 @@ func (db *DB) GetPropertyRequestForOwner(ctx context.Context, ownerUserID, reque
 			p.address,
 			p.city,
 			p.district,
-			p.user_id,
 			COALESCE(p.price, 0),
 			COALESCE(p.property_type, ''),
 			COALESCE(p.rooms, 0),

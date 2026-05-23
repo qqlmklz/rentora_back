@@ -534,12 +534,12 @@ func (s *ApplicationService) ConfirmTenantExpenses(ctx context.Context, ownerUse
 }
 
 // CompleteOwnerResolution завершает сценарий «устраняет владелец»: owner_resolves → completed.
-func (s *ApplicationService) CompleteOwnerResolution(ctx context.Context, ownerUserID, requestID int) (*models.PropertyRequestItem, error) {
+func (s *ApplicationService) CompleteOwnerResolution(ctx context.Context, ownerUserID, requestID int) (*models.CompleteRequestResponse, error) {
 	return s.CompleteOwnerRequest(ctx, ownerUserID, requestID)
 }
 
 // CompleteOwnerRequest завершает owner flow: owner_resolves → completed в БД.
-func (s *ApplicationService) CompleteOwnerRequest(ctx context.Context, ownerUserID, requestID int) (*models.PropertyRequestItem, error) {
+func (s *ApplicationService) CompleteOwnerRequest(ctx context.Context, ownerUserID, requestID int) (*models.CompleteRequestResponse, error) {
 	info, err := s.repo.GetRequestDecisionInfo(ctx, requestID)
 	if err != nil {
 		if errors.Is(err, repository.ErrRequestNotFound) {
@@ -565,22 +565,23 @@ func (s *ApplicationService) CompleteOwnerRequest(ctx context.Context, ownerUser
 		return nil, err
 	}
 	if saved == nil {
+		after, reloadErr := s.repo.GetRequestDecisionInfo(ctx, requestID)
+		if reloadErr == nil && after.Status == repository.ApplicationStatusCompleted {
+			return nil, ErrCompleteOwnerAlreadyDone
+		}
 		return nil, ErrCompleteOwnerWrongStatus
 	}
-	if !strings.EqualFold(strings.TrimSpace(saved.Status), models.RequestStatusCompleted) {
-		log.Printf("[requests-complete-owner-request] warn requestId=%d RETURNING status=%q", requestID, saved.Status)
-	}
 
-	row, err := s.repo.GetPropertyRequestForOwner(ctx, ownerUserID, requestID)
-	if err != nil {
-		if errors.Is(err, repository.ErrRequestNotFound) {
-			return nil, ErrCompleteOwnerNotFound
-		}
-		return nil, err
-	}
-	it := mapPropertyRequestRowToItem(*row)
-	log.Printf("[requests-complete-owner-request] requestId=%d ownerUserId=%d status=%s isArchived=%v", requestID, ownerUserID, it.Status, it.IsArchived)
-	return &it, nil
+	status := normalizeRequestStatusForAPI(saved.Status)
+	log.Printf("[requests-complete-owner-request] requestId=%d ownerUserId=%d status=%s isArchived=%v", requestID, ownerUserID, status, saved.IsArchived)
+	return &models.CompleteRequestResponse{
+		Success: true,
+		Request: models.RequestCompleteSnapshot{
+			ID:         saved.ID,
+			Status:     status,
+			IsArchived: saved.IsArchived,
+		},
+	}, nil
 }
 
 func nullTimeToPtr(nt sql.NullTime) *time.Time {
