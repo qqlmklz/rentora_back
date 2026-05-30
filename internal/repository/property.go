@@ -161,7 +161,7 @@ func (db *DB) ListProperties(ctx context.Context, f PropertyFilters) ([]models.P
 	return props, nil
 }
 
-// Возвращаем одно объявление для страницы деталей (category всегда есть; apartmentNumber может скрыть handler для не-владельца).
+// Возвращаем одно объявление для страницы деталей (category всегда есть; apartmentNumber скрывает обработчик для не-владельца).
 func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDetail, error) {
 	row := db.Pool.QueryRow(ctx, `
 		SELECT
@@ -319,7 +319,7 @@ func (db *DB) GetPropertyByID(ctx context.Context, id int) (*models.PropertyDeta
 	return &d, nil
 }
 
-// UpsertPropertyView фиксирует последнее время просмотра объявления пользователем.
+// Фиксирует последнее время просмотра объявления пользователем (upsert в property_views).
 func (db *DB) UpsertPropertyView(ctx context.Context, userID, propertyID int) error {
 	_, err := db.Pool.Exec(ctx, `
 		INSERT INTO property_views (user_id, property_id, viewed_at)
@@ -389,7 +389,7 @@ func (db *DB) ListRecommendations(ctx context.Context, userID, limit int) ([]mod
 		return props, nil
 	}
 
-	// Fallback, если истории просмотров еще нет: просто свежие неархивные объявления.
+	// Запасной вариант без истории просмотров: свежие неархивные объявления.
 	fallbackRows, err := db.Pool.Query(ctx, `
 		SELECT
 			p.id,

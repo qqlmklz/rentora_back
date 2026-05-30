@@ -34,7 +34,7 @@ func Auth(jwtSecret string) gin.HandlerFunc {
 	}
 }
 
-// Достаем user ID, который положил Auth middleware. Использовать после Auth.
+// Достаем идентификатор пользователя из контекста (после middleware Auth).
 func GetUserID(c *gin.Context) (int, bool) {
 	id, ok := c.Get(userIDKey)
 	if !ok {

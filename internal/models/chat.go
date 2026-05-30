@@ -13,7 +13,7 @@ type CreateChatResponse struct {
 	OwnerID int `json:"ownerId"` // идентификатор владельца объявления (если сравнить с currentUser.id, можно понять роль арендодателя)
 }
 
-// Одна запись списка для GET /api/chats (companion* — это собеседник, не текущий пользователь).
+// Одна запись списка для GET /api/chats (поля companion* — собеседник, не текущий пользователь).
 type ChatListItem struct {
 	ID              int        `json:"id"`
 	PropertyID      int        `json:"propertyId"`

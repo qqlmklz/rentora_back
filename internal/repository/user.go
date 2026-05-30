@@ -97,7 +97,7 @@ func (db *DB) UpdatePassword(ctx context.Context, id int, passwordHash string) e
 	return err
 }
 
-// Ищем пользователя по email, исключая id = excludeID (нужно для проверки конфликта).
+// Ищем пользователя по email, исключая указанный id (проверка занятости email).
 func (db *DB) GetUserByEmailExcludingID(ctx context.Context, email string, excludeID int) (*models.User, error) {
 	var u models.User
 	err := db.Pool.QueryRow(ctx, `

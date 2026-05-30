@@ -1,7 +1,7 @@
 package models
 
 // Ответ для GET /api/properties/:id.
-// Номер квартиры отдаем только владельцу (когда JWT совпадает с owner).
+// Номер квартиры отдаём только владельцу (когда JWT совпадает с owner_id).
 type PropertyDetail struct {
 	ID                  int      `json:"id"`
 	Title               string   `json:"title"`

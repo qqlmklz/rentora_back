@@ -20,7 +20,7 @@ type ChatService struct {
 	hub  *ws.Hub
 }
 
-// Конструктор ChatService. hub может быть nil (например, в тестах), тогда ws-рассылка не работает.
+// Конструктор ChatService. hub может быть nil (например, в тестах) — тогда рассылка по WebSocket отключена.
 func NewChatService(repo *repository.DB, hub *ws.Hub) *ChatService {
 	return &ChatService{repo: repo, hub: hub}
 }

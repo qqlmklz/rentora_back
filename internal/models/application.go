@@ -32,7 +32,7 @@ type CreateRequestBody struct {
 
 // ProfileRequestsEntry — допустимый элемент массивов activeRequests и archivedRequests в GET /api/profile/requests.
 // В JSON это гетерогенный массив объектов без поля-типа: каждый элемент либо ProfileRequestItem, либо PropertyRequestItem
-// (различие по набору полей: у «моих» заявок есть category и priorityStatus/priorityScore; у заявок по моим объектам — без category/priorityStatus).
+// (различие: у «моих» заявок жильца дополнительно есть category; остальные поля заявки совпадают с PropertyRequestItem).
 type ProfileRequestsEntry interface {
 	profileRequestsEntry()
 }
@@ -69,7 +69,7 @@ type ProfileRequestItem struct {
 	PropertyDistrict string    `json:"propertyDistrict"`
 	PropertyOwnerID  int       `json:"propertyOwnerId"`
 	Property         *Property `json:"property,omitempty"`
-	TenantExpensesConfirmedAt *time.Time `json:"confirmedAt,omitempty"`
+	TenantExpensesConfirmedAt *time.Time `json:"tenantExpensesConfirmedAt,omitempty"`
 	IsArchived       bool      `json:"isArchived"`
 }
 
@@ -80,9 +80,13 @@ type PropertyRequestItem struct {
 	Description      string    `json:"description"`
 	Status           string    `json:"status"`
 	Priority         string    `json:"priority"`
+	PriorityStatus   string    `json:"priorityStatus"`
+	PriorityScore    float64   `json:"priorityScore"`
 	PriorityReason   string    `json:"priorityReason"`
 	ResolutionType   *string   `json:"resolutionType,omitempty"`
 	ResolutionTypeRaw *string  `json:"resolution_type,omitempty"`
+	RequesterID      int       `json:"requesterId"`
+	RequesterName    string    `json:"requesterName"`
 	RequestPhotos    []string  `json:"request_photos"`
 	ExpenseAmount    *float64  `json:"expenseAmount,omitempty"`
 	ExpenseComment   *string   `json:"expenseComment,omitempty"`
@@ -96,10 +100,8 @@ type PropertyRequestItem struct {
 	PropertyCity     string    `json:"propertyCity"`
 	PropertyDistrict string    `json:"propertyDistrict"`
 	Property         *Property `json:"property,omitempty"`
-	RequesterID      int       `json:"requesterId"`
-	RequesterName    string    `json:"requesterName"`
 	PropertyOwnerID  int       `json:"propertyOwnerId"`
-	TenantExpensesConfirmedAt *time.Time `json:"confirmedAt,omitempty"`
+	TenantExpensesConfirmedAt *time.Time `json:"tenantExpensesConfirmedAt,omitempty"`
 	IsArchived       bool      `json:"isArchived"`
 }
 
@@ -202,7 +204,7 @@ type RequestExpenseResponse struct {
 	IsArchived       bool      `json:"isArchived"`
 }
 
-// Снимок заявки после confirm (значения из БД, для диагностики архива).
+// Снимок заявки после подтверждения расходов (значения из БД, для диагностики архива).
 type ConfirmTenantExpenseRequestInfo struct {
 	ID         int    `json:"id"`
 	Status     string `json:"status"`

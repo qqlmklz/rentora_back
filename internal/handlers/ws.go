@@ -13,7 +13,7 @@ import (
 	wslib "github.com/gorilla/websocket"
 )
 
-// Поднимаем ws для GET /ws/chats; JWT берем из ?token= или из Authorization: Bearer.
+// WebSocket GET /ws/chats; JWT из ?token= или Authorization: Bearer.
 func ChatWebSocket(hub *ws.Hub, jwtSecret string, allowedOrigins []string) gin.HandlerFunc {
 	upgrader := wslib.Upgrader{
 		ReadBufferSize:  1024,

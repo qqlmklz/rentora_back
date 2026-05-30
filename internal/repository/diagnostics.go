@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// LogApplicationsSnapshot логирует все заявки (ограничение по строкам) и счётчики по БД.
-// Аналог «Request.findAll()»: видно, есть ли хоть одна строка со status = completed.
+// LogApplicationsSnapshot логирует заявки (с ограничением по числу строк) и счётчики по БД.
+// Нужно для диагностики: есть ли в базе строки со status = completed.
 func (db *DB) LogApplicationsSnapshot(ctx context.Context) {
 	var total int64
 	if err := db.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM applications`).Scan(&total); err != nil {

@@ -91,7 +91,7 @@ func GetProperties(propertyService *services.PropertyService, jwtSecret string) 
 		}
 		switch sortValue {
 		case "newest", "price_asc", "price_desc":
-			// ok
+			// допустимое значение sort
 		default:
 			utils.JSONErrorBadRequest(c, "Некорректный параметр sort")
 			return

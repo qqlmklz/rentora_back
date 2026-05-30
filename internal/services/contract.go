@@ -33,13 +33,13 @@ const (
 	msgContractTerminated = "Договор больше не действителен"
 )
 
-// Ошибка, когда accept/reject нельзя сделать в текущем статусе.
+// Ошибка, когда принять или отклонить договор нельзя в текущем статусе.
 var ErrContractWrongStatus = errors.New("contract wrong status")
 
 // Ошибка, если пытаемся расторгнуть договор, который уже расторгнут.
 var ErrContractAlreadyTerminated = errors.New("contract already terminated")
 
-// Ошибка, если расторжение вызвали не для статуса accepted.
+// Ошибка, если расторгли договор не из статуса accepted.
 var ErrContractMustBeAcceptedToTerminate = errors.New("contract must be accepted to terminate")
 
 // Ошибка, если у договора нет корректного contracts.chat_id.
@@ -166,7 +166,7 @@ func (s *ContractService) GetContractDraft(ctx context.Context, userID, chatID i
 	}, nil
 }
 
-// Создаем договор со статусом pending и системное сообщение типа contract (только арендодатель).
+// Создаём договор со статусом pending и системное сообщение типа contract (только арендодатель).
 func (s *ContractService) CreateContractFromChat(ctx context.Context, userID, chatID int, in models.CreateContractBody) (*models.PostChatContractResponse, error) {
 	propID, landlordID, tenantID, err := s.repo.GetChatParticipantRoles(ctx, chatID)
 	if err != nil {

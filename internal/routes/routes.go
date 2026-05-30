@@ -107,7 +107,7 @@ func favoriteRoutes(g *gin.RouterGroup, favService *services.FavoritesService, j
 	g.DELETE("/:propertyId", handlers.RemoveFavorite(favService))
 }
 
-// В chatRoutes везде нужен JWT, а доступ есть только у seller_id/buyer_id (подробности в handlers + services/chat).
+// В chatRoutes везде нужен JWT; доступ только у seller_id и buyer_id (см. handlers и services/chat).
 func chatRoutes(g *gin.RouterGroup, chatService *services.ChatService, contractService *services.ContractService, jwtSecret string) {
 	g.Use(middleware.Auth(jwtSecret))
 	g.POST("", handlers.CreateChat(chatService))

@@ -13,12 +13,12 @@ import (
 	"rentora/backend/internal/repository"
 )
 
-// Сервис для объявлений: список, детали и CRUD-операции.
+// Сервис для объявлений: список, детали, создание, изменение и удаление.
 type PropertyService struct {
 	repo *repository.DB
 }
 
-// Конструктор PropertyService.
+// Конструктор сервиса объявлений.
 func NewPropertyService(repo *repository.DB) *PropertyService {
 	return &PropertyService{repo: repo}
 }
@@ -94,14 +94,14 @@ func (s *PropertyService) ListMine(ctx context.Context, userID int) ([]models.Pr
 	return s.repo.ListPropertiesByUserID(ctx, userID)
 }
 
-// Удаляем объявление только если оно принадлежит userID.
+// Удаляем объявление только если оно принадлежит пользователю.
 func (s *PropertyService) DeleteOwned(ctx context.Context, userID, propertyID int) error {
 	return s.repo.DeletePropertyOwned(ctx, propertyID, userID)
 }
 
-// Применяем payload и синхронизируем фото: если ExistingPhotos != nil, в БД оставляем existingPhotos ∪ newPhotoURLs;
-// если ExistingPhotos == nil, просто добавляем newPhotoURLs (старые не трогаем).
-// На выходе возвращаем актуальный список image_url из property_images после успешного сохранения.
+// Применяем тело запроса и синхронизируем фото: если ExistingPhotos задан, в БД оставляем existingPhotos ∪ newPhotoURLs;
+// если nil — только добавляем newPhotoURLs (старые не трогаем).
+// Возвращаем актуальный список image_url из property_images после сохранения.
 func (s *PropertyService) UpdateOwned(ctx context.Context, userID, propertyID int, payload models.UpdatePropertyPayload, newPhotoURLs []string) ([]string, error) {
 	if !payload.HasMetaChanges() && len(newPhotoURLs) == 0 {
 		return nil, ErrEmptyPropertyPatch
@@ -153,7 +153,7 @@ func (s *PropertyService) UpdateOwned(ctx context.Context, userID, propertyID in
 	return final, nil
 }
 
-// Возвращает true, если dbURL есть в existingPhotos (фронт может прислать полный путь или только имя файла).
+// Возвращает true, если URL из БД есть в existingPhotos (фронт может прислать полный путь или только имя файла).
 func urlMatchesExistingPhotos(dbURL string, existingPhotos []string) bool {
 	dbURL = strings.TrimSpace(dbURL)
 	for _, k := range existingPhotos {

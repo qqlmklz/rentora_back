@@ -17,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Обработчик POST /api/chats: создаем чат или берем уже существующий (buyer = текущий пользователь).
+// Обработчик POST /api/chats: создаём чат или возвращаем существующий (buyer_id = текущий пользователь).
 func CreateChat(chatService *services.ChatService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)

@@ -17,7 +17,7 @@ func NewFavoritesService(repo *repository.DB) *FavoritesService {
 	return &FavoritesService{repo: repo}
 }
 
-// Просто алиасы ошибок из repository, чтобы удобно было в handlers.
+// Псевдонимы ошибок из repository для удобства в обработчиках.
 var (
 	ErrFavoriteExists    = repository.ErrFavoriteExists
 	ErrPropertyNotFound  = repository.ErrPropertyNotFound

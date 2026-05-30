@@ -11,28 +11,28 @@ const (
 	priorityHigh   = "high"
 )
 
-// PriorityInput - данные заявки, которые отправляем на анализ приоритета.
+// PriorityInput — данные заявки для анализа приоритета.
 type PriorityInput struct {
 	Title       string
 	Description string
 	Category    string
 }
 
-// PriorityResult - что вернул AI по приоритету.
+// PriorityResult — результат анализа приоритета от AI.
 type PriorityResult struct {
 	Priority       string  `json:"priority"`
 	PriorityScore  float64 `json:"priority_score"`
 	PriorityReason string  `json:"priority_reason"`
 }
 
-// PriorityAnalyzer - общий интерфейс для любого анализатора приоритета.
+// PriorityAnalyzer — интерфейс анализатора приоритета заявок.
 type PriorityAnalyzer interface {
 	Analyze(ctx context.Context, title, description, category string) (PriorityResult, string, error)
 }
 
 var ErrAIUnavailable = errors.New("ai unavailable")
 
-// DefaultPriorityResult - fallback, когда AI недоступен.
+// DefaultPriorityResult — значения по умолчанию, когда AI недоступен.
 func DefaultPriorityResult() PriorityResult {
 	return PriorityResult{
 		Priority:       priorityMedium,

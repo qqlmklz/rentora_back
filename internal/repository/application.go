@@ -21,7 +21,7 @@ const ApplicationPriorityPendingReason = ""
 
 var ErrRequestNotFound = errors.New("request not found")
 
-// ApplicationRow - одна заявка с данными объявления.
+// ApplicationRow — одна заявка с данными объявления.
 type ApplicationRow struct {
 	ID               int
 	UserID           int
@@ -58,7 +58,7 @@ type ApplicationRow struct {
 	PropertyPhotos   []string
 }
 
-// PropertyRequestRow - заявка по объекту владельца + данные автора заявки.
+// PropertyRequestRow — заявка по объекту владельца и данные автора заявки.
 type PropertyRequestRow struct {
 	ID               int
 	UserID           int
@@ -67,6 +67,8 @@ type PropertyRequestRow struct {
 	Status           string
 	IsArchived       bool
 	Priority         string
+	PriorityStatus   string
+	PriorityScore    float64
 	PriorityReason   string
 	ResolutionType   *string
 	RequestPhotos    []string
@@ -118,7 +120,7 @@ type RequestDecisionRow struct {
 	TenantExpensesConfirmedAt sql.NullTime
 }
 
-// AvailableRequestPropertyRow - объект, по которому пользователь может создать заявку.
+// AvailableRequestPropertyRow — объект, по которому пользователь может создать заявку.
 type AvailableRequestPropertyRow struct {
 	ID       int
 	Title    string
@@ -291,6 +293,8 @@ func (db *DB) ListApplicationsForOwnerProperties(ctx context.Context, ownerUserI
 			a.status,
 			a.is_archived,
 			a.priority,
+			a.priority_status,
+			a.priority_score,
 			a.priority_reason,
 			a.resolution_type,
 			COALESCE(a.request_photos, '[]'::jsonb),
@@ -348,6 +352,8 @@ func (db *DB) ListApplicationsForOwnerProperties(ctx context.Context, ownerUserI
 			&r.Status,
 			&r.IsArchived,
 			&r.Priority,
+			&r.PriorityStatus,
+			&r.PriorityScore,
 			&r.PriorityReason,
 			&resolutionType,
 			&requestPhotosRaw,
@@ -424,6 +430,8 @@ func (db *DB) GetPropertyRequestForOwner(ctx context.Context, ownerUserID, reque
 			a.status,
 			a.is_archived,
 			a.priority,
+			a.priority_status,
+			a.priority_score,
 			a.priority_reason,
 			a.resolution_type,
 			COALESCE(a.request_photos, '[]'::jsonb),
@@ -464,6 +472,8 @@ func (db *DB) GetPropertyRequestForOwner(ctx context.Context, ownerUserID, reque
 		&r.Status,
 		&r.IsArchived,
 		&r.Priority,
+		&r.PriorityStatus,
+		&r.PriorityScore,
 		&r.PriorityReason,
 		&resolutionType,
 		&requestPhotosRaw,
@@ -888,14 +898,14 @@ func (db *DB) ResolveOwnerRequest(ctx context.Context, requestID, ownerUserID in
 	return cmd.RowsAffected() > 0, nil
 }
 
-// CompleteOwnerFlowResult — строка после owner flow → completed (RETURNING).
+// CompleteOwnerFlowResult — строка после сценария владельца → completed (RETURNING).
 type CompleteOwnerFlowResult struct {
 	ID         int
 	Status     string
 	IsArchived bool
 }
 
-// CompleteOwnerRequestToCompleted: owner_resolves → completed, только владелец и resolution_type = owner.
+// CompleteOwnerRequestToCompleted: owner_resolves → completed; только владелец и resolution_type = owner.
 func (db *DB) CompleteOwnerRequestToCompleted(ctx context.Context, requestID, ownerUserID int) (*CompleteOwnerFlowResult, error) {
 	sqlQuery := `
 		UPDATE applications a
@@ -999,7 +1009,7 @@ func (db *DB) ListAvailableRequestProperties(ctx context.Context, userID int) ([
 	log.Printf("[available-properties] currentUserId=%d role=%s contracts=%v tenantPropertyIDs=%v ownerPropertyIDs=%v",
 		userID, roleType, tenantContractIDs, tenantPropertyIDs, ownerPropertyIDs)
 
-	// Объединяем owner + tenant accepted, чтобы объект не терялся, если у пользователя сразу две роли.
+	// Объединяем объекты владельца и арендатора (accepted), чтобы объект не терялся при двух ролях.
 	rows, err := db.Pool.Query(ctx, `
 		WITH allowed AS (
 			SELECT p.id FROM properties p WHERE p.user_id = $1

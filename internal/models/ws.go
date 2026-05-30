@@ -2,14 +2,14 @@ package models
 
 import "time"
 
-// Полезная нагрузка события "new_message", которое шлем по WebSocket.
+// Полезная нагрузка события new_message для WebSocket.
 type WSNewMessageEvent struct {
 	Type    string           `json:"type"`
 	ChatID  int              `json:"chatId"`
 	Message WSMessagePayload `json:"message"`
 }
 
-// Структура сообщения для ws, по сути зеркалит ChatMessage.
+// Структура сообщения в WebSocket; по полям совпадает с ChatMessage.
 type WSMessagePayload struct {
 	ID         int       `json:"id"`
 	ChatID     int       `json:"chatId"`

@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Возвращаем карточки объявлений, которые принадлежат userID.
+// Возвращаем карточки объявлений, которые принадлежат пользователю.
 func (db *DB) ListPropertiesByUserID(ctx context.Context, userID int) ([]models.Property, error) {
 	rows, err := db.Pool.Query(ctx, `
 		SELECT
@@ -73,7 +73,7 @@ func (db *DB) ListPropertiesByUserID(ctx context.Context, userID int) ([]models.
 	return out, nil
 }
 
-// Удаляем объявление только если оно принадлежит userID.
+// Удаляем объявление только если оно принадлежит пользователю.
 func (db *DB) DeletePropertyOwned(ctx context.Context, propertyID, userID int) error {
 	cmd, err := db.Pool.Exec(ctx, `
 		DELETE FROM properties WHERE id = $1 AND user_id = $2
@@ -99,7 +99,7 @@ func (db *DB) DeletePropertyOwned(ctx context.Context, propertyID, userID int) e
 	return ErrPropertyNotFound
 }
 
-// Загружаем полную строку объявления для merge/update. Если не нашли, вернем ErrPropertyNotFound.
+// Загружаем полную строку объявления для слияния с патчем. Если не нашли — ErrPropertyNotFound.
 func (db *DB) LoadPropertyForEdit(ctx context.Context, propertyID int) (ownerID int, in models.CreatePropertyInput, err error) {
 	row := db.Pool.QueryRow(ctx, `
 		SELECT
@@ -198,7 +198,7 @@ func (db *DB) LoadPropertyForEdit(ctx context.Context, propertyID int) (ownerID 
 	return ownerID, in, nil
 }
 
-// Обновляем все изменяемые колонки, если строка принадлежит userID (одним запросом).
+// Обновляем все изменяемые колонки, если объявление принадлежит пользователю (одним запросом).
 func (db *DB) UpdatePropertyFull(ctx context.Context, propertyID, userID int, in models.CreatePropertyInput) error {
 	cmd, err := db.Pool.Exec(ctx, `
 		UPDATE properties SET

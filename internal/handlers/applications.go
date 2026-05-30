@@ -139,7 +139,7 @@ func saveRequestPhotos(c *gin.Context, userID int) []string {
 	return saved
 }
 
-// GetProfileRequests handles GET /api/profile/requests (activeRequests + archivedRequests — плоские массивы).
+// Обработчик GET /api/profile/requests (activeRequests + archivedRequests — плоские массивы).
 func GetProfileRequests(applicationService *services.ApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -169,7 +169,7 @@ func GetProfileRequests(applicationService *services.ApplicationService) gin.Han
 	}
 }
 
-// CreateRequest handles POST /api/requests.
+// Обработчик POST /api/requests.
 func CreateRequest(applicationService *services.ApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -310,7 +310,7 @@ func CreateRequest(applicationService *services.ApplicationService) gin.HandlerF
 	}
 }
 
-// GetAvailableRequestProperties handles GET /api/requests/available-properties.
+// Обработчик GET /api/requests/available-properties.
 func GetAvailableRequestProperties(applicationService *services.ApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -332,7 +332,7 @@ func GetAvailableRequestProperties(applicationService *services.ApplicationServi
 	}
 }
 
-// DecideRequest handles POST /api/requests/:id/set-resolution (только владелец объявления).
+// Обработчик POST /api/requests/:id/set-resolution (только владелец объявления).
 func DecideRequest(applicationService *services.ApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -379,7 +379,7 @@ func DecideRequest(applicationService *services.ApplicationService) gin.HandlerF
 	}
 }
 
-// SubmitRequestExpense handles PATCH /api/requests/:id/expense.
+// Обработчик PATCH /api/requests/:id/expense.
 func SubmitRequestExpense(applicationService *services.ApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)
@@ -463,7 +463,7 @@ func SubmitRequestExpense(applicationService *services.ApplicationService) gin.H
 	}
 }
 
-// ConfirmTenantExpenses handles POST /api/requests/:id/confirm-tenant-expenses.
+// Обработчик POST /api/requests/:id/confirm-tenant-expenses.
 func ConfirmTenantExpenses(applicationService *services.ApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ownerID, ok := middleware.GetUserID(c)
@@ -501,7 +501,7 @@ func ConfirmTenantExpenses(applicationService *services.ApplicationService) gin.
 	}
 }
 
-// CompleteOwnerResolution handles POST /api/requests/:id/complete-owner.
+// Обработчик POST /api/requests/:id/complete-owner.
 func CompleteOwnerResolution(applicationService *services.ApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ownerID, ok := middleware.GetUserID(c)
@@ -537,7 +537,7 @@ func CompleteOwnerResolution(applicationService *services.ApplicationService) gi
 	}
 }
 
-// CompleteOwnerRequest handles POST /api/requests/:id/complete-owner-request (owner flow → status completed).
+// Обработчик POST /api/requests/:id/complete-owner-request (сценарий владельца → status completed).
 func CompleteOwnerRequest(applicationService *services.ApplicationService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ownerID, ok := middleware.GetUserID(c)

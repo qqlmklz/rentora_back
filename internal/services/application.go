@@ -54,8 +54,8 @@ func NewApplicationService(repo *repository.DB, analyzer aiSvc.PriorityAnalyzer)
 	}
 }
 
-// ListProfileRequests — без изменения запросов к БД: ListApplicationsByUser + ListApplicationsForOwnerProperties.
-// Дальше только разделение в памяти на два слайса: activeRequests (status !== completed), archivedRequests (status === completed).
+// ListProfileRequests — без изменения запросов к БД: заявки жильца и заявки по объектам владельца.
+// Дальше только разделение в памяти: activeRequests (status !== completed), archivedRequests (status === completed).
 func (s *ApplicationService) ListProfileRequests(ctx context.Context, userID int, bucket string) (*models.ProfileRequestsResponse, error) {
 	_ = bucket
 
@@ -160,7 +160,7 @@ func joinSplitProfileIDs(my []models.ProfileRequestItem, props []models.Property
 	return strings.Join(parts, ", ")
 }
 
-// normalizeRequestStatusForAPI: пустой/битый статус из БД → pending (иначе фронт и фильтр activeRequests ломаются).
+// normalizeRequestStatusForAPI: пустой или битый статус из БД → pending (иначе ломаются фронт и activeRequests).
 func normalizeRequestStatusForAPI(status string) string {
 	s := strings.TrimSpace(status)
 	if s == "" {
@@ -169,7 +169,7 @@ func normalizeRequestStatusForAPI(status string) string {
 	return s
 }
 
-// profileStatusIsCompleted: archivedRequests = status === "completed"; activeRequests = всё остальное после нормализации.
+// profileStatusIsCompleted: в архиве status === "completed"; в активных — всё остальное после нормализации.
 func profileStatusIsCompleted(status string) bool {
 	return strings.EqualFold(strings.TrimSpace(status), models.RequestStatusCompleted)
 }
@@ -183,7 +183,7 @@ func applicationIsArchived(status string) bool {
 	}
 }
 
-// rowIsArchived: флаг из БД; при старых данных без колонки — по финальному статусу.
+// rowIsArchived: флаг is_archived из БД; при старых данных без колонки — по финальному статусу.
 func rowIsArchived(dbValue bool, status string) bool {
 	if dbValue {
 		return true
@@ -252,10 +252,10 @@ func mapApplicationRowToProfileRequestItem(r repository.ApplicationRow) models.P
 		ResolutionTypeRaw:  r.ResolutionType,
 		RequesterID:      r.UserID,
 		RequesterName:    r.RequesterName,
-		RequestPhotos:    r.RequestPhotos,
+		RequestPhotos:    nonNilStringSlice(r.RequestPhotos),
 		ExpenseAmount:    r.ExpenseAmount,
 		ExpenseComment:   r.ExpenseComment,
-		ExpensePhotos:    r.ExpensePhotos,
+		ExpensePhotos:    nonNilStringSlice(r.ExpensePhotos),
 		ExpensesSubmitted: r.ExpensesSubmitted,
 		CreatedAt:        r.CreatedAt,
 		PropertyID:       r.PropertyID,
@@ -274,21 +274,44 @@ func mapApplicationRowToProfileRequestItem(r repository.ApplicationRow) models.P
 func mapPropertyRequestRowToItem(r repository.PropertyRequestRow) models.PropertyRequestItem {
 	st := normalizeRequestStatusForAPI(r.Status)
 	arch := profileStatusIsCompleted(st)
-	it := models.PropertyRequestItem{
-		ID:               r.ID,
-		Title:            r.Title,
-		Description:      r.Description,
-		Status:           st,
-		RequesterID:      r.RequesterID,
-		RequesterName:    r.RequesterName,
-		PropertyOwnerID:  r.PropertyOwnerID,
+	requestPhotos := r.RequestPhotos
+	if requestPhotos == nil {
+		requestPhotos = []string{}
+	}
+	expensePhotos := r.ExpensePhotos
+	if expensePhotos == nil {
+		expensePhotos = []string{}
+	}
+	return models.PropertyRequestItem{
+		ID:                        r.ID,
+		Title:                     r.Title,
+		Description:               r.Description,
+		Status:                    st,
+		Priority:                  r.Priority,
+		PriorityStatus:            r.PriorityStatus,
+		PriorityScore:             r.PriorityScore,
+		PriorityReason:            r.PriorityReason,
+		ResolutionType:            r.ResolutionType,
+		ResolutionTypeRaw:         r.ResolutionType,
+		RequesterID:               r.RequesterID,
+		RequesterName:             r.RequesterName,
+		RequestPhotos:             requestPhotos,
+		ExpenseAmount:             r.ExpenseAmount,
+		ExpenseComment:            r.ExpenseComment,
+		ExpensePhotos:             expensePhotos,
+		ExpensesSubmitted:         r.ExpensesSubmitted,
+		CreatedAt:                 r.CreatedAt,
+		PropertyID:                r.PropertyID,
+		PropertyTitle:             r.PropertyTitle,
+		PropertyPhoto:             r.PropertyPhoto,
+		PropertyAddress:           r.PropertyAddress,
+		PropertyCity:              r.PropertyCity,
+		PropertyDistrict:          r.PropertyDistrict,
+		Property:                  propertyCardFromPropertyRequestRow(r),
+		PropertyOwnerID:           r.PropertyOwnerID,
 		TenantExpensesConfirmedAt: nullTimeToPtr(r.TenantExpensesConfirmedAt),
-		IsArchived:       arch,
+		IsArchived:                arch,
 	}
-	if property := propertyCardFromPropertyRequestRow(r); property != nil {
-		it.Property = property
-	}
-	return it
 }
 
 func extractOwnerRequestIDs(rows []repository.PropertyRequestRow) []int {
@@ -538,7 +561,7 @@ func (s *ApplicationService) CompleteOwnerResolution(ctx context.Context, ownerU
 	return s.CompleteOwnerRequest(ctx, ownerUserID, requestID)
 }
 
-// CompleteOwnerRequest завершает owner flow: owner_resolves → completed в БД.
+// CompleteOwnerRequest завершает сценарий владельца: owner_resolves → completed в БД.
 func (s *ApplicationService) CompleteOwnerRequest(ctx context.Context, ownerUserID, requestID int) (*models.CompleteRequestResponse, error) {
 	info, err := s.repo.GetRequestDecisionInfo(ctx, requestID)
 	if err != nil {
@@ -582,6 +605,13 @@ func (s *ApplicationService) CompleteOwnerRequest(ctx context.Context, ownerUser
 			IsArchived: saved.IsArchived,
 		},
 	}, nil
+}
+
+func nonNilStringSlice(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 func nullTimeToPtr(nt sql.NullTime) *time.Time {

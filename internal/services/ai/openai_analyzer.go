@@ -18,7 +18,7 @@ import (
 
 const defaultOpenAIModel = "gpt-4o-mini"
 
-// OpenAIPriorityAnalyzer - реальный анализатор через OpenAI Responses API.
+// OpenAIPriorityAnalyzer — анализатор приоритета через OpenAI Responses API.
 type OpenAIPriorityAnalyzer struct {
 	client openai.Client
 	model  string

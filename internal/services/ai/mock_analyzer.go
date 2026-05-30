@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// MockPriorityAnalyzer - локальный анализатор для dev/testing.
+// MockPriorityAnalyzer — локальный анализатор для разработки и тестов.
 type MockPriorityAnalyzer struct{}
 
 func NewMockPriorityAnalyzer() *MockPriorityAnalyzer {

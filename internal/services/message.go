@@ -41,7 +41,7 @@ func MessageRowToChatMessage(chatID int, m repository.MessageRow) models.ChatMes
 	}
 }
 
-// Собираем ws-payload из сохраненной строки сообщения.
+// Собираем полезную нагрузку WebSocket из сохранённой строки сообщения.
 func WSMessagePayloadFromRow(chatID int, m repository.MessageRow) models.WSMessagePayload {
 	cm := MessageRowToChatMessage(chatID, m)
 	return models.WSMessagePayload{

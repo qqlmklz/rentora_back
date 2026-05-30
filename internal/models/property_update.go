@@ -52,7 +52,7 @@ func (p UpdatePropertyPatch) IsEmpty() bool {
 		p.KitchenArea == nil && p.Floor == nil && p.TotalFloors == nil && p.HousingType == nil
 }
 
-// Применяем patch к base: обновляем только те поля, которые не nil.
+// Применяем патч к base: обновляем только поля, которые заданы (не nil).
 func ApplyPropertyPatch(base *CreatePropertyInput, patch UpdatePropertyPatch) {
 	if patch.RentType != nil {
 		base.RentType = *patch.RentType

@@ -12,7 +12,7 @@ type HealthResponse struct {
 	Message string `json:"message"`
 }
 
-// Хендлер для health-check эндпоинта.
+// Обработчик проверки работоспособности GET /api/health.
 func Health(c *gin.Context) {
 	c.JSON(http.StatusOK, HealthResponse{
 		Status:  "ok",

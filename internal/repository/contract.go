@@ -26,7 +26,7 @@ var ErrContractNotFound = errors.New("contract not found")
 // Ошибка, когда пользователю нельзя выполнять действие с договором.
 var ErrContractForbidden = errors.New("contract forbidden")
 
-// Берем роли и id участников чата (seller = landlord, buyer = tenant).
+// Берём роли и id участников чата (seller — арендодатель, buyer — арендатор).
 func (db *DB) GetChatParticipantRoles(ctx context.Context, chatID int) (propertyID, landlordID, tenantID int, err error) {
 	err = db.Pool.QueryRow(ctx, `
 		SELECT property_id, seller_id, buyer_id FROM chats WHERE id = $1

@@ -10,13 +10,13 @@ import (
 
 var ErrInvalidToken = errors.New("invalid token")
 
-// Тут лежат JWT-claims (subject = user ID).
+// JWT-claims: subject — идентификатор пользователя.
 type Claims struct {
 	jwt.RegisteredClaims
 	UserID int `json:"user_id"`
 }
 
-// Создаем JWT для указанного user ID, срок жизни 7 дней.
+// Создаём JWT для указанного пользователя, срок жизни 7 дней.
 func NewToken(userID int, secret string) (string, error) {
 	now := time.Now()
 	claims := Claims{
@@ -31,7 +31,7 @@ func NewToken(userID int, secret string) (string, error) {
 	return t.SignedString([]byte(secret))
 }
 
-// Парсим JWT и возвращаем user ID. Если не получилось, вернем ErrInvalidToken.
+// Парсим JWT и возвращаем идентификатор пользователя. При ошибке — ErrInvalidToken.
 func ParseToken(tokenString, secret string) (userID int, err error) {
 	t, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil

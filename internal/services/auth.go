@@ -79,7 +79,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*model
 	return u, token, nil
 }
 
-// Возвращаем пользователя по ID (для /me). Если не нашли, вернем nil.
+// Возвращаем пользователя по id (для GET /api/auth/me). Если не нашли — nil.
 func (s *AuthService) GetUserByID(ctx context.Context, id int) (*models.User, error) {
 	return s.repo.GetUserByID(ctx, id)
 }

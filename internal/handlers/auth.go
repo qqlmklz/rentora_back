@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Регистрируем нового пользователя. AuthService приходит через closure.
+// Регистрируем нового пользователя. AuthService передаётся через замыкание.
 func Register(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req models.RegisterRequest
@@ -41,7 +41,7 @@ func Register(authService *services.AuthService) gin.HandlerFunc {
 	}
 }
 
-// Логиним по email/password и возвращаем JWT плюс пользователя.
+// Вход по email и паролю; в ответе JWT и данные пользователя.
 func Login(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req models.LoginRequest
@@ -69,7 +69,7 @@ func Login(authService *services.AuthService) gin.HandlerFunc {
 	}
 }
 
-// Возвращаем текущего пользователя из JWT.
+// Обработчик GET /api/auth/me — текущий пользователь из JWT.
 func Me(authService *services.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, ok := middleware.GetUserID(c)

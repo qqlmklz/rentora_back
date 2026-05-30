@@ -11,13 +11,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Хаб хранит активные ws-соединения по user id (несколько вкладок = несколько conn).
+// Хаб хранит активные WebSocket-соединения по идентификатору пользователя (несколько вкладок — несколько соединений).
 type Hub struct {
 	mu    sync.RWMutex
 	conns map[int]map[*websocket.Conn]struct{}
 }
 
-// Создаем пустой Hub.
+// Создаём пустой хаб соединений.
 func NewHub() *Hub {
 	return &Hub{conns: make(map[int]map[*websocket.Conn]struct{})}
 }
@@ -46,7 +46,7 @@ func (h *Hub) Unregister(userID int, conn *websocket.Conn) {
 	log.Printf("[ws] disconnected user_id=%d", userID)
 }
 
-// Рассылаем событие new_message всем нужным пользователям (участникам чата).
+// Рассылаем событие new_message участникам чата.
 func (h *Hub) BroadcastNewMessage(chatID, sellerID, buyerID int, msg models.WSMessagePayload) {
 	ev := models.WSNewMessageEvent{
 		Type:    "new_message",
